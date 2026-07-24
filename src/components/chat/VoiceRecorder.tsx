@@ -4,7 +4,7 @@ import { supabase } from '../../lib/supabase';
 import { useParams } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 
-export function VoiceRecorder({ onSent }: { onSent: () => void }) {
+export function VoiceRecorder({ onSent, onAudioPreview }: { onSent: () => void, onAudioPreview?: (isPreview: boolean) => void }) {
   const { id } = useParams();
   const { user } = useAuth();
   const [isRecording, setIsRecording] = useState(false);
@@ -15,6 +15,12 @@ export function VoiceRecorder({ onSent }: { onSent: () => void }) {
   const streamRef = useRef<MediaStream | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const startTimeRef = useRef<number>(0);
+
+  useEffect(() => {
+    if (onAudioPreview) {
+      onAudioPreview(!!audioBlob);
+    }
+  }, [audioBlob, onAudioPreview]);
 
   useEffect(() => {
     return () => {
@@ -94,7 +100,24 @@ export function VoiceRecorder({ onSent }: { onSent: () => void }) {
         mime_type: audioBlob.type
     });
     
-    if (dbError) { console.error('Database error:', dbError); setError('Failed to save message.'); return; }
+    if (dbError) {
+        console.error("VOICE MESSAGE INSERT ERROR", {
+          error: dbError,
+          payload: {
+            id: messageId,
+            conversation_id: id,
+            sender_id: user.id,
+            content_type: 'voice',
+            storage_path: filePath,
+            duration: duration,
+            mime_type: audioBlob.type
+          },
+          conversationId: id,
+          userId: user.id
+        });
+        setError('Failed to save message.'); 
+        return; 
+    }
 
     // 2. Upload
     const { error: uploadError } = await supabase.storage.from('voice-messages-temp').upload(filePath, audioBlob);

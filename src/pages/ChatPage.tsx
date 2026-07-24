@@ -12,6 +12,7 @@ export default function ChatPage() {
   const [messages, setMessages] = useState<any[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [messagesLoading, setMessagesLoading] = useState(true);
+  const [isPreviewMode, setIsPreviewMode] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -70,15 +71,19 @@ export default function ChatPage() {
         ))}
         <div ref={scrollRef} />
       </div>
-      <form onSubmit={sendMessage} className="p-4 border-t flex gap-2">
-        <VoiceRecorder onSent={() => {}} />
-        <input 
-          value={newMessage}
-          onChange={(e) => setNewMessage(e.target.value)}
-          className="flex-1 p-3 border rounded-full outline-none"
-          placeholder="Type a message..."
-        />
-        <button type="submit" className="p-3 bg-blue-600 text-white rounded-full"><Send size={20} /></button>
+      <form onSubmit={sendMessage} className="p-4 border-t flex gap-2 w-full items-center">
+        <VoiceRecorder onSent={() => {}} onAudioPreview={(isPreview) => setIsPreviewMode(isPreview)} />
+        {!isPreviewMode && (
+          <>
+            <input 
+              value={newMessage}
+              onChange={(e) => setNewMessage(e.target.value)}
+              className="flex-1 p-3 border rounded-full outline-none min-w-0"
+              placeholder="Type a message..."
+            />
+            <button type="submit" className="p-3 bg-blue-600 text-white rounded-full flex-shrink-0"><Send size={20} /></button>
+          </>
+        )}
       </form>
     </div>
   );
