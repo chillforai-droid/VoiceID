@@ -1,0 +1,45 @@
+import { motion } from 'motion/react';
+import { useNavigate } from 'react-router-dom';
+import InteractiveMockup from './InteractiveMockup';
+
+export default function Hero() {
+  const navigate = useNavigate();
+  return (
+    <section className="pt-32 pb-20 px-6 text-center">
+      <motion.h1
+        initial={{ y: 20, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        transition={{ delay: 0.1 }}
+        className="text-6xl md:text-8xl font-extrabold tracking-tighter text-black mb-6"
+      >
+        Your Voice.<br />Your Identity.
+      </motion.h1>
+      <motion.p
+        initial={{ y: 20, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        transition={{ delay: 0.2 }}
+        className="text-xl text-gray-600 mb-10 max-w-2xl mx-auto"
+      >
+        A permanent, secure identity for the internet. Communicate instantly without ever sharing your phone number again.
+      </motion.p>
+      <motion.div
+        initial={{ y: 20, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        transition={{ delay: 0.3 }}
+        className="flex gap-4 justify-center"
+      >
+        <button onClick={() => navigate('/auth/welcome')} className="px-8 py-4 text-lg font-semibold text-white bg-blue-600 rounded-full hover:bg-blue-700 transition">Create VoiceID</button>
+        <button className="px-8 py-4 text-lg font-semibold text-black bg-gray-100 rounded-full hover:bg-gray-200 transition">Watch Demo</button>
+      </motion.div>
+      
+      <motion.div
+        initial={{ scale: 0.95, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        transition={{ delay: 0.5 }}
+        className="mt-20"
+      >
+        <InteractiveMockup />
+      </motion.div>
+    </section>
+  );
+}
