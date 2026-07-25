@@ -6,6 +6,7 @@ import Welcome from './components/auth/Welcome';
 import SignUp from './components/auth/SignUp';
 import Login from './components/auth/Login';
 import ChooseVoiceID from './components/auth/ChooseVoiceID';
+import ConfirmPage from './pages/auth/ConfirmPage';
 import AuthCallbackPage from './pages/auth/AuthCallbackPage';
 import ForgotPasswordPage from './pages/auth/ForgotPasswordPage';
 import ResetPasswordPage from './pages/auth/ResetPasswordPage';
@@ -28,6 +29,7 @@ export default function App() {
           <Route path="/auth/signup" element={<SignUp />} />
           <Route path="/auth/login" element={<Login />} />
           <Route path="/auth/callback" element={<AuthCallbackPage />} />
+          <Route path="/auth/confirm" element={<ConfirmPage />} />
           <Route path="/auth/forgot-password" element={<ForgotPasswordPage />} />
           <Route path="/auth/reset-password" element={<ResetPasswordPage />} />
           <Route path="/auth/choose-id" element={<ChooseVoiceID />} />

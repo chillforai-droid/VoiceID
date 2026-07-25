@@ -15,7 +15,7 @@ export default function ForgotPasswordPage() {
     setMessage('');
 
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/auth/reset-password`,
+      redirectTo: 'https://voiceid.online/auth/reset-password',
     });
 
     if (error) {

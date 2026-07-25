@@ -26,7 +26,10 @@ export default function SignUp() {
     const { error: signUpError } = await supabase.auth.signUp({
       email: data.email,
       password: data.password,
-      options: { data: { full_name: data.fullName } }
+      options: { 
+        data: { full_name: data.fullName },
+        emailRedirectTo: 'https://voiceid.online/auth/confirm'
+      }
     });
     setLoading(false);
     if (signUpError) {
