@@ -15,15 +15,29 @@ export default function ConversationsPage() {
     if (!user) { setLoading(false); return; }
 
     const fetchConversations = async () => {
+      // 1. Get IDs of conversations the user is a member of
+      const { data: memberships, error: membershipsError } = await supabase
+        .from('conversation_members')
+        .select('conversation_id')
+        .eq('user_id', user?.id);
+
+      if (membershipsError || !memberships) {
+        setLoading(false);
+        return;
+      }
+
+      const convIds = memberships.map((m) => m.conversation_id);
+
+      // 2. Fetch conversations and all their members
       const { data, error } = await supabase
         .from('conversations')
         .select(`
           id,
           last_message_at,
-          conversation_members!inner(user_id, profiles(display_name, avatar_url)),
-          messages(content_body, created_at)
+          conversation_members(user_id, profiles(display_name, avatar_url)),
+          messages(content_body, created_at, message_type)
         `)
-        .eq('conversation_members.user_id', user?.id)
+        .in('id', convIds)
         .order('last_message_at', { ascending: false });
 
       if (!error && data) {
@@ -66,7 +80,9 @@ export default function ConversationsPage() {
                 </div>
                 <div className="flex-1">
                   <p className="font-semibold">{otherMember?.display_name || 'Unknown'}</p>
-                  <p className="text-sm text-gray-500 truncate">{latestMessage?.content_body || 'No messages'}</p>
+                  <p className="text-sm text-gray-500 truncate">
+                    {latestMessage?.message_type === 'voice' ? 'Voice message' : (latestMessage?.content_body || 'No messages')}
+                  </p>
                 </div>
                 <p className="text-xs text-gray-400">{new Date(conv.last_message_at).toLocaleTimeString()}</p>
               </div>

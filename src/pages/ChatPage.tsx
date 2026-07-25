@@ -56,7 +56,7 @@ export default function ChatPage() {
     
     if (error) {
         console.error('Message insert error:', error);
-        alert(`Failed to save message: ${error.message}`);
+        alert(`Failed to save message: ${error.message}. Details: ${JSON.stringify(error)}`);
     } else {
         setNewMessage('');
     }
