@@ -37,11 +37,17 @@ export default function EditProfilePage() {
     try {
         // Get signature from our API
         const timestamp = Math.round(new Date().getTime() / 1000);
+        const folder = 'voiceid/avatars';
+        const public_id = user?.id;
+
         const { signature, apiKey } = await fetch('/api/cloudinary-sign', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ timestamp, folder: 'voiceid/avatars' })
-        }).then(r => r.json());
+            body: JSON.stringify({ timestamp, folder, public_id })
+        }).then(r => {
+            if (!r.ok) throw new Error('Failed to get signature');
+            return r.json();
+        });
 
         // Upload to Cloudinary
         const formData = new FormData();
@@ -49,21 +55,28 @@ export default function EditProfilePage() {
         formData.append('signature', signature);
         formData.append('api_key', apiKey);
         formData.append('timestamp', timestamp.toString());
-        formData.append('folder', 'voiceid/avatars');
-        formData.append('public_id', user?.id || '');
+        formData.append('folder', folder);
+        formData.append('public_id', public_id || '');
 
         const res = await fetch(`https://api.cloudinary.com/v1_1/${import.meta.env.VITE_CLOUDINARY_CLOUD_NAME}/image/upload`, {
             method: 'POST',
             body: formData
         });
+        
+        if (!res.ok) {
+            const errorData = await res.json();
+            console.error("Cloudinary upload failed:", errorData);
+            throw new Error('Cloudinary upload failed');
+        }
+        
         const data = await res.json();
+        if (!data.secure_url) throw new Error('Cloudinary secure_url missing');
 
         // Update profile
         const { error: updateError } = await supabase.from('profiles').update({ avatar_url: data.secure_url }).eq('id', user?.id);
         if (updateError) {
             console.error("Supabase update error:", updateError);
-            setMessage('Failed to save avatar to profile.');
-            return;
+            throw new Error('Failed to save avatar to profile.');
         }
         
         await updateProfile();
