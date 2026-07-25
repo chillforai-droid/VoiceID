@@ -2,6 +2,7 @@ import React from 'react';
 import { useLocation } from 'react-router-dom';
 import MobileBottomNav from './MobileBottomNav';
 import DesktopSidebar from './DesktopSidebar';
+import { CallManager } from '../chat/CallManager';
 
 interface AppShellProps {
   children: React.ReactNode;
@@ -13,6 +14,7 @@ export default function AppShell({ children }: AppShellProps) {
 
   return (
     <div className="flex h-screen bg-gray-50">
+      <CallManager />
       {/* Desktop Sidebar */}
       {!isChatRoute && (
         <div className="hidden md:flex">

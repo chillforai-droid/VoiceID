@@ -40,14 +40,25 @@ export default function EditProfilePage() {
         const folder = 'voiceid/avatars';
         const public_id = user?.id;
 
-        const { signature, apiKey } = await fetch('/api/cloudinary-sign', {
+        console.log("Requesting signature with:", { timestamp, folder, public_id });
+        const response = await fetch('/api/cloudinary-sign', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ timestamp, folder, public_id })
-        }).then(r => {
-            if (!r.ok) throw new Error('Failed to get signature');
-            return r.json();
         });
+
+        if (!response.ok) {
+            let errorText = "No response text";
+            try {
+                errorText = await response.text();
+                console.error("Failed to get signature, status:", response.status, "text:", errorText);
+            } catch (e) {
+                console.error("Failed to read response text");
+            }
+            throw new Error(`Failed to get signature: Status ${response.status}. ${errorText}`);
+        }
+        
+        const { signature, apiKey } = await response.json();
 
         // Upload to Cloudinary
         const formData = new FormData();

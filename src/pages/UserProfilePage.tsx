@@ -3,10 +3,12 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { Phone, Mic, UserPlus, Loader2, UserCheck, UserX, Ban } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { useVoiceCall } from '../hooks/useVoiceCall';
 
 export default function UserProfilePage() {
   const { id } = useParams();
   const { user, loading: authLoading } = useAuth();
+  const { initiateCall } = useVoiceCall();
   const [profile, setProfile] = useState<any>(null);
   const [contactRelation, setContactRelation] = useState<{ status: string | null, isIncoming: boolean }>({ status: null, isIncoming: false });
   const [profileLoading, setProfileLoading] = useState(true);
@@ -132,7 +134,7 @@ export default function UserProfilePage() {
         )}
         
         <div className="flex gap-4 justify-center">
-            <button className="p-5 bg-blue-50 text-blue-600 rounded-full hover:bg-blue-100 transition"><Phone size={24} /></button>
+            <button onClick={() => initiateCall(id!)} className="p-5 bg-blue-50 text-blue-600 rounded-full hover:bg-blue-100 transition"><Phone size={24} /></button>
             <button onClick={handleMessageAction} className="p-5 bg-purple-50 text-purple-600 rounded-full hover:bg-purple-100 transition"><Mic size={24} /></button>
             {contactRelation.status === null && <button onClick={() => handleContactAction('add')} className="p-5 bg-gray-100 text-gray-600 rounded-full hover:bg-gray-200 transition"><UserPlus size={24} /></button>}
             {contactRelation.status === 'pending' && contactRelation.isIncoming && (

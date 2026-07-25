@@ -2,17 +2,17 @@ import { Home, Search, Mail, Bell, Settings, LogOut, User } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 
-const menuItems = [
-  { icon: Home, label: 'Home', path: '/dashboard' },
-  { icon: Search, label: 'Search', path: '/dashboard/search' },
-  { icon: Mail, label: 'Messages', path: '/dashboard/messages' },
-  { icon: Bell, label: 'Notifications', path: '/dashboard/notifications' },
-  { icon: User, label: 'Profile', path: '/dashboard/profile/me' },
-  { icon: Settings, label: 'Settings', path: '/dashboard/settings' },
-];
-
 export default function DesktopSidebar() {
-  const { signOut } = useAuth();
+  const { user, signOut } = useAuth();
+  
+  const menuItems = [
+    { icon: Home, label: 'Home', path: '/dashboard' },
+    { icon: Search, label: 'Search', path: '/dashboard/search' },
+    { icon: Mail, label: 'Messages', path: '/dashboard/messages' },
+    { icon: Bell, label: 'Notifications', path: '/dashboard/notifications' },
+    { icon: User, label: 'Profile', path: user ? `/dashboard/profile/${user.id}` : '/dashboard/profile/me' },
+    { icon: Settings, label: 'Settings', path: '/dashboard/settings' },
+  ];
 
   return (
     <div className="w-64 border-r border-gray-200 h-screen flex flex-col p-4 bg-white">
