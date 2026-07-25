@@ -35,7 +35,7 @@ export default function ConversationsPage() {
           id,
           last_message_at,
           conversation_members(user_id, profiles(display_name, avatar_url)),
-          messages(content_body, created_at, message_type)
+          messages(content_body, created_at, content_type)
         `)
         .in('id', convIds)
         .order('last_message_at', { ascending: false });
@@ -54,7 +54,15 @@ export default function ConversationsPage() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'conversations' }, fetchConversations)
       .subscribe();
 
-    return () => { supabase.removeChannel(subscription); };
+    const messageSubscription = supabase
+      .channel('messages')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, fetchConversations)
+      .subscribe();
+
+    return () => { 
+        supabase.removeChannel(subscription);
+        supabase.removeChannel(messageSubscription);
+    };
   }, [user, authLoading]);
 
   if (loading) return <div className="flex justify-center p-20"><Loader2 className="animate-spin text-blue-500" size={32}/></div>;
@@ -81,7 +89,7 @@ export default function ConversationsPage() {
                 <div className="flex-1">
                   <p className="font-semibold">{otherMember?.display_name || 'Unknown'}</p>
                   <p className="text-sm text-gray-500 truncate">
-                    {latestMessage?.message_type === 'voice' ? 'Voice message' : (latestMessage?.content_body || 'No messages')}
+                    {latestMessage?.content_type === 'voice' ? 'Voice message' : (latestMessage?.content_body || 'No messages')}
                   </p>
                 </div>
                 <p className="text-xs text-gray-400">{new Date(conv.last_message_at).toLocaleTimeString()}</p>
