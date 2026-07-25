@@ -73,13 +73,40 @@ export default function EditProfilePage() {
         if (!data.secure_url) throw new Error('Cloudinary secure_url missing');
 
         // Update profile
-        const { error: updateError } = await supabase.from('profiles').update({ avatar_url: data.secure_url }).eq('id', user?.id);
+        console.log("Authenticated user UUID:", user?.id);
+        const { data: updatedProfile, error: updateError } = await supabase
+            .from('profiles')
+            .update({ avatar_url: data.secure_url })
+            .eq('id', user?.id)
+            .select('avatar_url')
+            .single();
+
         if (updateError) {
             console.error("Supabase update error:", updateError);
             throw new Error('Failed to save avatar to profile.');
         }
         
+        console.log("Supabase update result (data):", updatedProfile);
+        
+        // Verify persistence by refetching
+        const { data: refetchedProfile, error: refetchError } = await supabase
+            .from('profiles')
+            .select('avatar_url')
+            .eq('id', user?.id)
+            .single();
+            
+        console.log("Refetched avatar_url:", refetchedProfile?.avatar_url);
+
+        if (refetchedProfile?.avatar_url !== data.secure_url) {
+            console.error("Avatar URL persistence mismatch!");
+            throw new Error('Failed to persist avatar to profile.');
+        }
+
+        // Update local state immediately
+        // Note: We need a way to update the local avatar in AuthContext/Profile.
+        // For now, let's just trigger the profile refetch.
         await updateProfile();
+        
         setMessage('Avatar updated!');
         console.log("Avatar updated successfully. New URL:", data.secure_url);
     } catch (e) {
