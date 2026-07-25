@@ -54,6 +54,7 @@ export default function ConversationsPage() {
         <div className="space-y-2">
           {conversations.map((conv) => {
             const otherMember = conv.conversation_members.find((m: any) => m.user_id !== user?.id)?.profiles;
+            const latestMessage = conv.messages.sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0];
             return (
               <div 
                 key={conv.id} 
@@ -65,7 +66,7 @@ export default function ConversationsPage() {
                 </div>
                 <div className="flex-1">
                   <p className="font-semibold">{otherMember?.display_name || 'Unknown'}</p>
-                  <p className="text-sm text-gray-500 truncate">{conv.messages[0]?.content_body || 'No messages'}</p>
+                  <p className="text-sm text-gray-500 truncate">{latestMessage?.content_body || 'No messages'}</p>
                 </div>
                 <p className="text-xs text-gray-400">{new Date(conv.last_message_at).toLocaleTimeString()}</p>
               </div>

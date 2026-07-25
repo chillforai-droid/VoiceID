@@ -47,13 +47,19 @@ export default function ChatPage() {
     e.preventDefault();
     if (!newMessage.trim() || !user || !id) return;
 
-    await supabase.from('messages').insert({
+    const { error } = await supabase.from('messages').insert({
       conversation_id: id,
       sender_id: user?.id,
       content_body: newMessage,
       content_type: 'text'
     });
-    setNewMessage('');
+    
+    if (error) {
+        console.error('Message insert error:', error);
+        alert(`Failed to save message: ${error.message}`);
+    } else {
+        setNewMessage('');
+    }
   };
 
   if (authLoading || messagesLoading) return <div className="flex justify-center p-20"><Loader2 className="animate-spin text-blue-500" size={32}/></div>;
