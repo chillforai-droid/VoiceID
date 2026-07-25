@@ -1,0 +1,41 @@
+import { Home, Search, MessageSquare, Bell, User } from 'lucide-react';
+import { NavLink } from 'react-router-dom';
+import { useAuth } from '../../context/AuthContext';
+import { useNotifications } from '../../context/NotificationContext';
+
+export default function MobileBottomNav() {
+  const { user } = useAuth();
+  const { unreadCount, unreadMessageCount } = useNotifications();
+
+  const navItems = [
+    { name: 'Home', path: '/dashboard', icon: Home, badge: 0 },
+    { name: 'Search', path: '/dashboard/search', icon: Search, badge: 0 },
+    { name: 'Messages', path: '/dashboard/messages', icon: MessageSquare, badge: unreadMessageCount },
+    { name: 'Notifications', path: '/dashboard/notifications', icon: Bell, badge: unreadCount },
+    { name: 'Profile', path: user ? `/dashboard/profile/${user.id}` : '/dashboard/profile/me', icon: User, badge: 0 },
+  ];
+
+  return (
+    <nav className="bg-white border-t border-gray-200 flex justify-around items-center h-16 px-2">
+      {navItems.map((item) => (
+        <NavLink
+          key={item.name}
+          to={item.path}
+          className={({ isActive }) =>
+            `relative flex flex-col items-center justify-center w-full h-full text-xs font-medium ${
+              isActive ? 'text-blue-600' : 'text-gray-500'
+            }`
+          }
+        >
+          {item.badge > 0 && (
+            <span className="absolute top-1 right-4 bg-red-500 text-white text-[10px] w-5 h-5 flex items-center justify-center rounded-full">
+              {item.badge > 99 ? '99+' : item.badge}
+            </span>
+          )}
+          <item.icon className="w-6 h-6 mb-1" />
+          {item.name}
+        </NavLink>
+      ))}
+    </nav>
+  );
+}

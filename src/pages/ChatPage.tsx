@@ -1,14 +1,17 @@
 import { useState, useEffect, useRef } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
-import { Send, Loader2 } from 'lucide-react';
+import { useNotifications } from '../context/NotificationContext';
+import { Send, Loader2, ArrowLeft } from 'lucide-react';
 import { VoiceRecorder } from '../components/chat/VoiceRecorder';
 import { VoiceMessage } from '../components/chat/VoiceMessage';
 
 export default function ChatPage() {
   const { id } = useParams();
+  const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
+  const { markConversationRead } = useNotifications();
   const [messages, setMessages] = useState<any[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [messagesLoading, setMessagesLoading] = useState(true);
@@ -16,6 +19,7 @@ export default function ChatPage() {
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    if (id) markConversationRead(id);
     if (authLoading || !id || !user) return;
 
     const fetchMessages = async () => {
@@ -32,14 +36,21 @@ export default function ChatPage() {
     fetchMessages();
 
     const subscription = supabase
-      .channel('messages')
+      .channel(`messages:${id}`)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `conversation_id=eq.${id}` }, (payload) => {
+        console.log("Realtime INSERT received:", payload);
         setMessages(prev => {
-          if (prev.find(m => m.id === payload.new.id)) return prev;
-          return [...prev, payload.new];
+          if (prev.find(m => m.id === payload.new.id)) {
+            console.log("Duplicate message skipped:", payload.new.id);
+            return prev;
+          }
+          console.log("Appending realtime message:", payload.new.id);
+          return [...prev, payload.new].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
         });
       })
-      .subscribe();
+      .subscribe((status) => {
+        console.log("Realtime subscription status:", status);
+      });
 
     return () => { supabase.removeChannel(subscription); };
   }, [id, user, authLoading]);
@@ -50,18 +61,24 @@ export default function ChatPage() {
     e.preventDefault();
     if (!newMessage.trim() || !user || !id) return;
 
-    const { error } = await supabase.from('messages').insert({
+    const { data, error } = await supabase.from('messages').insert({
       conversation_id: id,
       sender_id: user?.id,
       content_body: newMessage,
       content_type: 'text'
-    });
+    }).select().single();
     
     if (error) {
         console.error('Message insert error:', error);
-        alert(`Failed to save message: ${error.message}. Details: ${JSON.stringify(error)}`);
+        alert(`Failed to save message. Details: ${error.message} - ${error.details || ''}`);
     } else {
+        console.log("Message inserted:", data.id);
         setNewMessage('');
+        // We do NOT need to append here if realtime works, but it's safer for UX to append immediately
+        setMessages(prev => {
+           if (prev.find(m => m.id === data.id)) return prev;
+           return [...prev, data];
+        });
     }
   };
 
@@ -69,28 +86,40 @@ export default function ChatPage() {
   if (!user) return <div className="p-20 text-center">Please sign in to chat.</div>;
 
   return (
-    <div className="flex flex-col h-[calc(100vh-100px)]">
+    <div className="flex flex-col h-full bg-gray-50">
+      <div className="sticky top-0 bg-white border-b border-gray-200 p-4 flex items-center gap-3 z-10">
+        <button onClick={() => navigate('/dashboard/messages')} className="p-2 hover:bg-gray-100 rounded-full">
+            <ArrowLeft size={20} className="text-gray-600" />
+        </button>
+        <div className="w-10 h-10 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold">?</div>
+        <div className="flex-1 font-semibold text-gray-900">Conversation</div>
+      </div>
+      
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
         {messages.map((m) => (
           <div key={m.id} className={`flex ${m.sender_id === user?.id ? 'justify-end' : 'justify-start'}`}>
-            <div className={`p-3 rounded-2xl max-w-[80%] ${m.sender_id === user?.id ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-900'}`}>
+            <div className={`p-3 px-4 rounded-2xl max-w-[85%] ${m.sender_id === user?.id ? 'bg-blue-600 text-white rounded-tr-sm' : 'bg-white text-gray-900 rounded-tl-sm border border-gray-100'}`}>
               {m.content_type === 'voice' ? <VoiceMessage message={m} /> : m.content_body}
+              <p className={`text-[10px] mt-1 ${m.sender_id === user?.id ? 'text-blue-100' : 'text-gray-400'}`}>
+                {new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+              </p>
             </div>
           </div>
         ))}
         <div ref={scrollRef} />
       </div>
-      <form onSubmit={sendMessage} className="p-4 border-t flex gap-2 w-full items-center">
+      
+      <form onSubmit={sendMessage} className="p-4 bg-white border-t flex gap-2 w-full items-center">
         <VoiceRecorder onSent={() => {}} onAudioPreview={(isPreview) => setIsPreviewMode(isPreview)} />
         {!isPreviewMode && (
           <>
             <input 
               value={newMessage}
               onChange={(e) => setNewMessage(e.target.value)}
-              className="flex-1 p-3 border rounded-full outline-none min-w-0"
-              placeholder="Type a message..."
+              className="flex-1 p-3 px-4 bg-gray-100 border-none rounded-full outline-none focus:ring-2 focus:ring-blue-500 min-w-0"
+              placeholder="Message..."
             />
-            <button type="submit" className="p-3 bg-blue-600 text-white rounded-full flex-shrink-0"><Send size={20} /></button>
+            <button type="submit" disabled={!newMessage.trim()} className="p-3 bg-blue-600 text-white rounded-full flex-shrink-0 disabled:opacity-50"><Send size={20} /></button>
           </>
         )}
       </form>

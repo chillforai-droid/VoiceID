@@ -125,6 +125,12 @@ export default function UserProfilePage() {
         <p className="text-blue-600 font-medium text-lg mb-6">@{profile.username}</p>
         <p className="text-gray-600 text-lg mb-10 leading-relaxed">{profile.bio || 'No bio yet.'}</p>
         
+        {user?.id === id && (
+            <div className="flex gap-4 justify-center mb-10">
+                <button onClick={() => navigate('/dashboard/profile/edit')} className="px-6 py-2 bg-blue-600 text-white rounded-full">Edit Profile</button>
+            </div>
+        )}
+        
         <div className="flex gap-4 justify-center">
             <button className="p-5 bg-blue-50 text-blue-600 rounded-full hover:bg-blue-100 transition"><Phone size={24} /></button>
             <button onClick={handleMessageAction} className="p-5 bg-purple-50 text-purple-600 rounded-full hover:bg-purple-100 transition"><Mic size={24} /></button>

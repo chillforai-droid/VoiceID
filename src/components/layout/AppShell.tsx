@@ -1,0 +1,45 @@
+import React from 'react';
+import { useLocation } from 'react-router-dom';
+import MobileBottomNav from './MobileBottomNav';
+import DesktopSidebar from './DesktopSidebar';
+
+interface AppShellProps {
+  children: React.ReactNode;
+}
+
+export default function AppShell({ children }: AppShellProps) {
+  const location = useLocation();
+  const isChatRoute = location.pathname.startsWith('/dashboard/chat/');
+
+  return (
+    <div className="flex h-screen bg-gray-50">
+      {/* Desktop Sidebar */}
+      {!isChatRoute && (
+        <div className="hidden md:flex">
+          <DesktopSidebar />
+        </div>
+      )}
+      
+      {/* Main Content */}
+      <div className="flex-1 flex flex-col h-full overflow-hidden">
+        {/* Top Header (Contextual) */}
+        {!isChatRoute && (
+          <header className="h-16 border-b border-gray-200 bg-white flex items-center px-4 justify-between md:hidden">
+            <h1 className="font-semibold text-lg text-gray-900">VoiceID</h1>
+          </header>
+        )}
+        
+        <main className="flex-1 overflow-y-auto pb-20 md:pb-0">
+          {children}
+        </main>
+      </div>
+      
+      {/* Mobile Bottom Nav */}
+      {!isChatRoute && (
+        <div className="md:hidden fixed bottom-0 left-0 right-0 z-50">
+          <MobileBottomNav />
+        </div>
+      )}
+    </div>
+  );
+}

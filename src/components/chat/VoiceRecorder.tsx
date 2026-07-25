@@ -94,6 +94,7 @@ export function VoiceRecorder({ onSent, onAudioPreview }: { onSent: () => void, 
         id: messageId,
         conversation_id: id,
         sender_id: user.id,
+        content_body: '',
         content_type: 'voice',
         storage_path: filePath,
         duration: duration,
@@ -101,20 +102,7 @@ export function VoiceRecorder({ onSent, onAudioPreview }: { onSent: () => void, 
     });
     
     if (dbError) {
-        console.error("VOICE MESSAGE INSERT ERROR", {
-          error: dbError,
-          payload: {
-            id: messageId,
-            conversation_id: id,
-            sender_id: user.id,
-            content_type: 'voice',
-            storage_path: filePath,
-            duration: duration,
-            mime_type: audioBlob.type
-          },
-          conversationId: id,
-          userId: user.id
-        });
+        console.error("VOICE MESSAGE INSERT ERROR", { error: dbError });
         setError('Failed to save message.'); 
         return; 
     }
@@ -134,14 +122,14 @@ export function VoiceRecorder({ onSent, onAudioPreview }: { onSent: () => void, 
       <div className="flex items-center gap-2">
         {audioBlob ? (
           <>
-            <button onClick={() => setAudioBlob(null)} className="p-3 text-red-500"><X /></button>
-            <button onClick={() => new Audio(URL.createObjectURL(audioBlob)).play()} className="p-3 bg-gray-200 rounded-full"><Play /></button>
-            <button onClick={sendAudio} className="p-3 bg-blue-600 text-white rounded-full"><Send /></button>
+            <button onClick={() => setAudioBlob(null)} className="p-3 text-gray-500 hover:bg-gray-100 rounded-full"><X size={20} /></button>
+            <button onClick={() => new Audio(URL.createObjectURL(audioBlob)).play()} className="p-3 bg-gray-100 text-gray-700 rounded-full"><Play size={20} /></button>
+            <button onClick={sendAudio} className="p-3 bg-blue-600 text-white rounded-full"><Send size={20} /></button>
           </>
         ) : isRecording ? (
-          <button onClick={stopRecording} className="p-3 bg-red-500 text-white rounded-full"><StopCircle /></button>
+          <button onClick={stopRecording} className="p-3 bg-red-500 text-white rounded-full animate-pulse"><StopCircle size={20} /></button>
         ) : (
-          <button onClick={startRecording} className="p-3 bg-gray-200 rounded-full"><Mic /></button>
+          <button onClick={startRecording} className="p-3 bg-gray-100 text-gray-600 hover:bg-gray-200 rounded-full"><Mic size={20} /></button>
         )}
       </div>
     </div>
