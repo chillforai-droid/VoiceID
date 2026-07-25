@@ -1,12 +1,14 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import { Phone, Mic, UserPlus, Loader2, UserCheck, UserX, Ban } from 'lucide-react';
+import { Phone, Mic, UserPlus, Loader2, UserCheck, UserX, Ban, Share } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useVoiceCall } from '../hooks/useVoiceCall';
 import { usePresence } from '../context/PresenceContext';
+import { useNoIndex } from '../hooks/useNoIndex';
 
 export default function UserProfilePage() {
+  useNoIndex();
   const { id } = useParams();
   const { user, loading: authLoading } = useAuth();
   const { initiateCall, canCallUser } = useVoiceCall();
@@ -59,6 +61,28 @@ export default function UserProfilePage() {
       } else {
           initiateCall(resolvedProfileId!);
       }
+  };
+
+  const handleShare = async () => {
+    const profileUrl = `${window.location.origin}/profile/${resolvedProfileId}`;
+    if (navigator.share) {
+        try {
+            await navigator.share({
+                title: `${profile.display_name} on VoiceID`,
+                text: `Connect with @${profile.username} on VoiceID.`,
+                url: profileUrl,
+            });
+        } catch (err) {
+            console.error('Error sharing:', err);
+        }
+    } else {
+        try {
+            await navigator.clipboard.writeText(profileUrl);
+            alert('Profile link copied');
+        } catch (err) {
+            console.error('Error copying:', err);
+        }
+    }
   };
 
   const handleContactAction = async (action: 'add' | 'accept' | 'reject' | 'remove' | 'block' | 'unblock') => {
@@ -150,6 +174,7 @@ export default function UserProfilePage() {
         {user?.id === resolvedProfileId && (
             <div className="flex gap-4 justify-center mb-10">
                 <button onClick={() => navigate('/dashboard/profile/edit')} className="px-6 py-2 bg-blue-600 text-white rounded-full">Edit Profile</button>
+                <button onClick={handleShare} className="p-2 bg-gray-100 text-gray-600 rounded-full hover:bg-gray-200"><Share size={24} /></button>
             </div>
         )}
         
@@ -157,6 +182,7 @@ export default function UserProfilePage() {
             <div className="flex gap-4 justify-center">
                 <button onClick={handleCall} className={`p-5 rounded-full transition ${!isOnline || contactRelation.status !== 'accepted' ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-blue-50 text-blue-600 hover:bg-blue-100'}`}><Phone size={24} /></button>
                 <button onClick={handleMessageAction} className="p-5 bg-purple-50 text-purple-600 rounded-full hover:bg-purple-100 transition"><Mic size={24} /></button>
+                <button onClick={handleShare} className="p-5 bg-gray-100 text-gray-600 rounded-full hover:bg-gray-200 transition"><Share size={24} /></button>
                 {contactRelation.status === null && <button onClick={() => handleContactAction('add')} className="p-5 bg-gray-100 text-gray-600 rounded-full hover:bg-gray-200 transition"><UserPlus size={24} /></button>}
                 {contactRelation.status === 'pending' && contactRelation.isIncoming && (
                     <>

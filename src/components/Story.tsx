@@ -2,7 +2,7 @@ import { motion } from 'motion/react';
 
 export default function Story() {
   return (
-    <section className="py-20 px-6 max-w-7xl mx-auto">
+    <section id="about" className="py-20 px-6 max-w-7xl mx-auto">
       <h2 className="text-4xl font-extrabold tracking-tighter text-center mb-16">Stop Sharing Your Phone Number.</h2>
       <div className="grid md:grid-cols-2 gap-10">
         <div className="p-8 bg-gray-50 rounded-3xl">

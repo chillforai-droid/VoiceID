@@ -15,7 +15,6 @@ export default function LandingPage() {
       <Hero />
       <Story />
       <Features />
-      <Demo />
       <Security />
       <FutureVision />
       <FAQ />

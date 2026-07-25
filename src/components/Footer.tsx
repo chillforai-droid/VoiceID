@@ -9,24 +9,24 @@ export default function Footer() {
         <div>
           <h4 className="font-bold mb-4">Product</h4>
           <ul className="space-y-2 text-sm text-gray-500">
-            <li>Features</li>
-            <li>Security</li>
-            <li>Developers</li>
+            <li><a href="#features" className="hover:text-black">Features</a></li>
+            <li><a href="#security" className="hover:text-black">Security</a></li>
+            <li><a href="#" className="hover:text-black">Developers</a></li>
           </ul>
         </div>
         <div>
           <h4 className="font-bold mb-4">Company</h4>
           <ul className="space-y-2 text-sm text-gray-500">
-            <li>About</li>
-            <li>Careers</li>
-            <li>Blog</li>
+            <li><a href="#about" className="hover:text-black">About</a></li>
+            <li><a href="/careers" className="hover:text-black">Careers</a></li>
+            <li><a href="/blog" className="hover:text-black">VoiceID Blog</a></li>
           </ul>
         </div>
         <div>
           <h4 className="font-bold mb-4">Resources</h4>
           <ul className="space-y-2 text-sm text-gray-500">
-            <li>Privacy</li>
-            <li>Terms</li>
+            <li><a href="/privacy-policy" className="hover:text-black">Privacy Policy</a></li>
+            <li><a href="/terms-of-service" className="hover:text-black">Terms of Service</a></li>
           </ul>
         </div>
       </div>

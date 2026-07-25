@@ -1,20 +1,56 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://ai.google.dev/static/site-assets/images/share-ais-513315318.png" />
-</div>
+# VoiceID
 
-# Run and deploy your AI Studio app
+VoiceID is a secure, username-based communication platform that allows users to connect, message, and talk without sharing their personal phone numbers.
 
-This contains everything you need to run your app locally.
+## V1 Features
 
-View your app in AI Studio: https://ai.studio/apps/962133be-b51f-42d4-bfa1-cd501afc363a
+- Authentication
+- VoiceID/user profiles
+- Profile avatars
+- User search
+- Contacts/friends
+- Realtime text messaging
+- Voice messages
+- Realtime notifications
+- Online presence
+- WebRTC voice calling
 
-## Run Locally
+## Technology Stack
 
-**Prerequisites:**  Node.js
+- React (19+)
+- TypeScript
+- Vite
+- Supabase (PostgreSQL, Realtime, Auth)
+- WebRTC
+- Cloudinary
+- Vercel (Deployment)
 
+## Architecture
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+- **Frontend**: React SPA
+- **Authentication**: Supabase Auth
+- **Database**: PostgreSQL (Supabase)
+- **Realtime**: Supabase Realtime
+- **Media storage**: Cloudinary
+- **Voice calling**: WebRTC / Supabase Realtime Signaling
+
+## Environment Variables
+
+- `VITE_SUPABASE_URL`
+- `VITE_SUPABASE_ANON_KEY`
+- `VITE_CLOUDINARY_CLOUD_NAME`
+
+## Local Development
+
+```bash
+npm install
+npm run dev
+```
+
+## Production
+
+Production domain: https://voiceid.online
+
+## V1 Status
+
+V1 functionality is fully implemented and verified.

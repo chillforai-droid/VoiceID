@@ -5,6 +5,10 @@ import { PresenceProvider } from './context/PresenceContext';
 import { NotificationProvider } from './context/NotificationContext';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 import LandingPage from './pages/LandingPage';
+import Careers from './pages/Careers';
+import Blog from './pages/Blog';
+import PrivacyPolicy from './pages/PrivacyPolicy';
+import TermsOfService from './pages/TermsOfService';
 import Welcome from './components/auth/Welcome';
 import SignUp from './components/auth/SignUp';
 import Login from './components/auth/Login';
@@ -32,6 +36,10 @@ export default function App() {
             <BrowserRouter>
               <Routes>
                 <Route path="/" element={<LandingPage />} />
+                <Route path="/careers" element={<Careers />} />
+                <Route path="/blog" element={<Blog />} />
+                <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+                <Route path="/terms-of-service" element={<TermsOfService />} />
                 <Route path="/auth/welcome" element={<Welcome />} />
                 <Route path="/auth/signup" element={<SignUp />} />
                 <Route path="/auth/login" element={<Login />} />
@@ -40,6 +48,7 @@ export default function App() {
                 <Route path="/auth/forgot-password" element={<ForgotPasswordPage />} />
                 <Route path="/auth/reset-password" element={<ResetPasswordPage />} />
                 <Route path="/auth/choose-id" element={<ChooseVoiceID />} />
+                <Route path="/profile/:id" element={<UserProfilePage />} />
                 <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>}>
                   <Route index element={<HomePage />} />
                   <Route path="search" element={<SearchPage />} />

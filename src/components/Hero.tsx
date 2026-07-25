@@ -4,6 +4,7 @@ import InteractiveMockup from './InteractiveMockup';
 
 export default function Hero() {
   const navigate = useNavigate();
+  
   return (
     <section className="pt-32 pb-20 px-6 text-center">
       <motion.h1
@@ -20,7 +21,7 @@ export default function Hero() {
         transition={{ delay: 0.2 }}
         className="text-xl text-gray-600 mb-10 max-w-2xl mx-auto"
       >
-        A permanent, secure identity for the internet. Communicate instantly without ever sharing your phone number again.
+        VoiceID is your permanent, secure digital identity for the internet. Communicate instantly and securely without ever sharing your phone number again.
       </motion.p>
       <motion.div
         initial={{ y: 20, opacity: 0 }}
@@ -29,7 +30,6 @@ export default function Hero() {
         className="flex gap-4 justify-center"
       >
         <button onClick={() => navigate('/auth/welcome')} className="px-8 py-4 text-lg font-semibold text-white bg-blue-600 rounded-full hover:bg-blue-700 transition">Create VoiceID</button>
-        <button className="px-8 py-4 text-lg font-semibold text-black bg-gray-100 rounded-full hover:bg-gray-200 transition">Watch Demo</button>
       </motion.div>
       
       <motion.div
