@@ -6,7 +6,7 @@
 
 This contains everything you need to run your app locally.
 
-View your app in AI Studio: https://voiceid.online
+View your app in AI Studio: https://ai.studio/apps/962133be-b51f-42d4-bfa1-cd501afc363a
 
 ## Run Locally
 
