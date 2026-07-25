@@ -34,7 +34,10 @@ export default function ChatPage() {
     const subscription = supabase
       .channel('messages')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `conversation_id=eq.${id}` }, (payload) => {
-        setMessages(prev => [...prev, payload.new]);
+        setMessages(prev => {
+          if (prev.find(m => m.id === payload.new.id)) return prev;
+          return [...prev, payload.new];
+        });
       })
       .subscribe();
 
