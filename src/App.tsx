@@ -1,5 +1,7 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
+import { VoiceCallProvider } from './context/VoiceCallContext';
+import { PresenceProvider } from './context/PresenceContext';
 import { NotificationProvider } from './context/NotificationContext';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 import LandingPage from './pages/LandingPage';
@@ -24,31 +26,35 @@ import SettingsPage from './pages/SettingsPage';
 export default function App() {
   return (
     <AuthProvider>
-      <NotificationProvider>
-        <BrowserRouter>
-          <Routes>
-            <Route path="/" element={<LandingPage />} />
-            <Route path="/auth/welcome" element={<Welcome />} />
-            <Route path="/auth/signup" element={<SignUp />} />
-            <Route path="/auth/login" element={<Login />} />
-            <Route path="/auth/callback" element={<AuthCallbackPage />} />
-            <Route path="/auth/confirm" element={<ConfirmPage />} />
-            <Route path="/auth/forgot-password" element={<ForgotPasswordPage />} />
-            <Route path="/auth/reset-password" element={<ResetPasswordPage />} />
-            <Route path="/auth/choose-id" element={<ChooseVoiceID />} />
-            <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>}>
-              <Route index element={<HomePage />} />
-              <Route path="search" element={<SearchPage />} />
-              <Route path="profile/:id" element={<UserProfilePage />} />
-              <Route path="profile/edit" element={<EditProfilePage />} />
-              <Route path="messages" element={<ConversationsPage />} />
-              <Route path="chat/:id" element={<ChatPage />} />
-              <Route path="notifications" element={<NotificationsPage />} />
-              <Route path="settings" element={<SettingsPage />} />
-            </Route>
-          </Routes>
-        </BrowserRouter>
-      </NotificationProvider>
+      <PresenceProvider>
+        <VoiceCallProvider>
+          <NotificationProvider>
+            <BrowserRouter>
+              <Routes>
+                <Route path="/" element={<LandingPage />} />
+                <Route path="/auth/welcome" element={<Welcome />} />
+                <Route path="/auth/signup" element={<SignUp />} />
+                <Route path="/auth/login" element={<Login />} />
+                <Route path="/auth/callback" element={<AuthCallbackPage />} />
+                <Route path="/auth/confirm" element={<ConfirmPage />} />
+                <Route path="/auth/forgot-password" element={<ForgotPasswordPage />} />
+                <Route path="/auth/reset-password" element={<ResetPasswordPage />} />
+                <Route path="/auth/choose-id" element={<ChooseVoiceID />} />
+                <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>}>
+                  <Route index element={<HomePage />} />
+                  <Route path="search" element={<SearchPage />} />
+                  <Route path="profile/:id" element={<UserProfilePage />} />
+                  <Route path="profile/edit" element={<EditProfilePage />} />
+                  <Route path="messages" element={<ConversationsPage />} />
+                  <Route path="chat/:id" element={<ChatPage />} />
+                  <Route path="notifications" element={<NotificationsPage />} />
+                  <Route path="settings" element={<SettingsPage />} />
+                </Route>
+              </Routes>
+            </BrowserRouter>
+          </NotificationProvider>
+        </VoiceCallProvider>
+      </PresenceProvider>
     </AuthProvider>
   );
 }
