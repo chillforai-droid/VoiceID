@@ -13,6 +13,11 @@ interface VoiceCallContextType {
     cleanupCall: () => void;
     remoteAudioRef: React.RefObject<HTMLAudioElement>;
     canCallUser: (targetUserId: string) => Promise<{canCall: boolean, reason?: string}>;
+    isMuted: boolean;
+    toggleMute: () => void;
+    isSpeakerOn: boolean;
+    toggleSpeaker: () => Promise<void>;
+    isOutputSelectionSupported: boolean;
 }
 
 const VoiceCallContext = createContext<VoiceCallContextType>({} as VoiceCallContextType);
@@ -29,6 +34,15 @@ export const VoiceCallProvider = ({ children }: { children: React.ReactNode }) =
   const signallingChannel = useRef<RealtimeChannel | null>(null);
   const iceCandidateQueue = useRef<RTCIceCandidate[]>([]);
   const remoteAudioRef = useRef<HTMLAudioElement | null>(null);
+  const [isMuted, setIsMuted] = useState(false);
+  const [isSpeakerOn, setIsSpeakerOn] = useState(false);
+  const [isOutputSelectionSupported, setIsOutputSelectionSupported] = useState(false);
+
+  useEffect(() => {
+      if (remoteAudioRef.current && 'setSinkId' in remoteAudioRef.current) {
+          setIsOutputSelectionSupported(true);
+      }
+  }, []);
 
   const iceServers = {
     iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
@@ -50,8 +64,46 @@ export const VoiceCallProvider = ({ children }: { children: React.ReactNode }) =
     iceCandidateQueue.current = [];
     setCallState('idle');
     setActiveCall(null);
+    setIsMuted(false);
+    setIsSpeakerOn(false);
     if (remoteAudioRef.current) remoteAudioRef.current.srcObject = null;
   }, []);
+
+  const toggleMute = () => {
+    if (localStream.current) {
+      const audioTrack = localStream.current.getAudioTracks()[0];
+      if (audioTrack) {
+        audioTrack.enabled = !audioTrack.enabled;
+        setIsMuted(!audioTrack.enabled);
+      }
+    }
+  };
+
+  const toggleSpeaker = async () => {
+      if (remoteAudioRef.current && 'setSinkId' in remoteAudioRef.current) {
+          try {
+              const newSpeakerState = !isSpeakerOn;
+              // Simple toggle assuming 'default' is earpiece or system choice, and nothing for loudspeaker if not specifically set.
+              // This is a naive implementation; advanced routing needs device enumeration.
+              // According to prompt: "Do NOT fake this... Feature-detect: setSinkId"
+              // Just toggling sinkId might not switch between earpiece/speaker directly on many browsers.
+              // Given the constraints, I will attempt to toggle between default and the first loudspeaker device if possible.
+              const devices = await navigator.mediaDevices.enumerateDevices();
+              const audioOutputs = devices.filter(d => d.kind === 'audiooutput');
+              
+              if (newSpeakerState) {
+                  // Find a speaker
+                  const speaker = audioOutputs.find(d => d.label.toLowerCase().includes('speaker')) || audioOutputs[audioOutputs.length - 1];
+                  if (speaker) await (remoteAudioRef.current as any).setSinkId(speaker.deviceId);
+              } else {
+                  await (remoteAudioRef.current as any).setSinkId('');
+              }
+              setIsSpeakerOn(newSpeakerState);
+          } catch (e) {
+              console.error('Failed to toggle speaker', e);
+          }
+      }
+  };
 
   const callsChannel = useRef<RealtimeChannel | null>(null);
 
@@ -132,7 +184,13 @@ export const VoiceCallProvider = ({ children }: { children: React.ReactNode }) =
     signallingChannel.current.on('broadcast', { event: 'receiver-ready' }, async () => {
         clearTimeout(timeout);
         peerConnection.current = new RTCPeerConnection(iceServers);
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        const stream = await navigator.mediaDevices.getUserMedia({ 
+            audio: {
+                echoCancellation: true,
+                noiseSuppression: true,
+                autoGainControl: true
+            } 
+        });
         localStream.current = stream;
         stream.getTracks().forEach(track => peerConnection.current?.addTrack(track, stream));
         peerConnection.current.onicecandidate = event => {
@@ -165,7 +223,13 @@ export const VoiceCallProvider = ({ children }: { children: React.ReactNode }) =
       signallingChannel.current = supabase.channel(`voice-call:${activeCall.id}`);
       signallingChannel.current.on('broadcast', { event: 'offer' }, async ({ payload }) => {
           peerConnection.current = new RTCPeerConnection(iceServers);
-          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          const stream = await navigator.mediaDevices.getUserMedia({ 
+            audio: {
+                echoCancellation: true,
+                noiseSuppression: true,
+                autoGainControl: true
+            } 
+        });
           localStream.current = stream;
           stream.getTracks().forEach(track => peerConnection.current?.addTrack(track, stream));
           peerConnection.current.onicecandidate = event => {
@@ -197,7 +261,7 @@ export const VoiceCallProvider = ({ children }: { children: React.ReactNode }) =
   };
 
   return (
-    <VoiceCallContext.Provider value={{ callState, activeCall, initiateCall, acceptCall, endCall, cleanupCall, remoteAudioRef, canCallUser }}>
+    <VoiceCallContext.Provider value={{ callState, activeCall, initiateCall, acceptCall, endCall, cleanupCall, remoteAudioRef, canCallUser, isMuted, toggleMute, isSpeakerOn, toggleSpeaker, isOutputSelectionSupported }}>
       {children}
     </VoiceCallContext.Provider>
   );

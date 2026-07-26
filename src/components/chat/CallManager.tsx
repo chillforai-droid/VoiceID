@@ -1,11 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { useVoiceCall } from '../../hooks/useVoiceCall';
-import { PhoneOff } from 'lucide-react';
+import { PhoneOff, Mic, MicOff, Volume2, VolumeX } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
 
 export const CallManager = () => {
-    const { callState, activeCall, acceptCall, endCall, remoteAudioRef } = useVoiceCall();
+    const { callState, activeCall, acceptCall, endCall, remoteAudioRef, isMuted, toggleMute, isSpeakerOn, toggleSpeaker, isOutputSelectionSupported } = useVoiceCall();
     const [otherProfile, setOtherProfile] = useState<any>(null);
     const { user } = useAuth();
 
@@ -52,9 +52,19 @@ export const CallManager = () => {
                 <div className="text-center space-y-4">
                     <h2 className="text-xl font-bold">{otherProfile?.display_name || 'Connected'}</h2>
                     <p className="text-gray-500">Connected</p>
-                    <button onClick={endCall} className="p-4 bg-red-500 text-white rounded-full">
-                        <PhoneOff size={32} />
-                    </button>
+                    <div className="flex gap-4 justify-center">
+                        <button onClick={toggleMute} className={`p-4 rounded-full ${isMuted ? 'bg-gray-400' : 'bg-gray-100'}`}>
+                            {isMuted ? <MicOff size={24} /> : <Mic size={24} />}
+                        </button>
+                        {isOutputSelectionSupported && (
+                             <button onClick={toggleSpeaker} className={`p-4 rounded-full ${isSpeakerOn ? 'bg-blue-600 text-white' : 'bg-gray-100'}`}>
+                                {isSpeakerOn ? <Volume2 size={24} /> : <VolumeX size={24} />}
+                            </button>
+                        )}
+                        <button onClick={endCall} className="p-4 bg-red-500 text-white rounded-full">
+                            <PhoneOff size={32} />
+                        </button>
+                    </div>
                 </div>
             )}
         </div>
