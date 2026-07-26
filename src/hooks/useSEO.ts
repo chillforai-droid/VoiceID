@@ -41,11 +41,21 @@ export const useSEO = ({ title, description, canonical, ogImage }: { title: stri
         if (twitterDesc) twitterDesc.setAttribute('content', description);
 
         if (ogImage) {
-            const ogImg = document.querySelector('meta[property="og:image"]');
-            if (ogImg) ogImg.setAttribute('content', ogImage);
+            let ogImg = document.querySelector('meta[property="og:image"]');
+            if (!ogImg) {
+                ogImg = document.createElement('meta');
+                ogImg.setAttribute('property', 'og:image');
+                document.head.appendChild(ogImg);
+            }
+            ogImg.setAttribute('content', ogImage);
             
-            const twitterImg = document.querySelector('meta[name="twitter:image"]');
-            if (twitterImg) twitterImg.setAttribute('content', ogImage);
+            let twitterImg = document.querySelector('meta[name="twitter:image"]');
+            if (!twitterImg) {
+                twitterImg = document.createElement('meta');
+                twitterImg.setAttribute('name', 'twitter:image');
+                document.head.appendChild(twitterImg);
+            }
+            twitterImg.setAttribute('content', ogImage);
         }
         
         return () => {
