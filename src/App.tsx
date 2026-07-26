@@ -26,6 +26,8 @@ import NotificationsPage from './pages/NotificationsPage';
 import ConversationsPage from './pages/ConversationsPage';
 import ChatPage from './pages/ChatPage';
 import SettingsPage from './pages/SettingsPage';
+import ContactPage from './pages/ContactPage';
+
 
 export default function App() {
   return (
@@ -40,6 +42,7 @@ export default function App() {
                 <Route path="/blog" element={<Blog />} />
                 <Route path="/privacy-policy" element={<PrivacyPolicy />} />
                 <Route path="/terms-of-service" element={<TermsOfService />} />
+                <Route path="/contact" element={<ContactPage />} />
                 <Route path="/auth/welcome" element={<Welcome />} />
                 <Route path="/auth/signup" element={<SignUp />} />
                 <Route path="/auth/login" element={<Login />} />
@@ -49,6 +52,7 @@ export default function App() {
                 <Route path="/auth/reset-password" element={<ResetPasswordPage />} />
                 <Route path="/auth/choose-id" element={<ChooseVoiceID />} />
                 <Route path="/profile/:id" element={<UserProfilePage />} />
+                <Route path="/u/:username" element={<UserProfilePage />} />
                 <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>}>
                   <Route index element={<HomePage />} />
                   <Route path="search" element={<SearchPage />} />

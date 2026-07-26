@@ -5,20 +5,39 @@ import { Phone, Mic, UserPlus, Loader2, UserCheck, UserX, Ban, Share } from 'luc
 import { useAuth } from '../context/AuthContext';
 import { useVoiceCall } from '../hooks/useVoiceCall';
 import { usePresence } from '../context/PresenceContext';
-import { useNoIndex } from '../hooks/useNoIndex';
+import { useSEO } from '../hooks/useSEO';
 
 export default function UserProfilePage() {
-  useNoIndex();
-  const { id } = useParams();
+  const { id, username } = useParams();
   const { user, loading: authLoading } = useAuth();
   const { initiateCall, canCallUser } = useVoiceCall();
   const { isUserOnline } = usePresence();
   const [profile, setProfile] = useState<any>(null);
   const [contactRelation, setContactRelation] = useState<{ status: string | null, isIncoming: boolean }>({ status: null, isIncoming: false });
   const [profileLoading, setProfileLoading] = useState(true);
+  const [resolvedProfileId, setResolvedProfileId] = useState<string | null>(null);
   const navigate = useNavigate();
 
-  const resolvedProfileId = id === 'me' ? user?.id : id;
+  useSEO({
+      title: profile ? `${profile.display_name} (@${profile.username}) | VoiceID` : 'VoiceID Profile',
+      description: profile ? `Connect with @${profile.username} on VoiceID.` : 'VoiceID Profile',
+      canonical: profile ? `https://voiceid.online/u/${profile.username}` : `https://voiceid.online/`
+  });
+
+  useEffect(() => {
+    if (authLoading) return;
+    const resolveId = async () => {
+        if (id) {
+            setResolvedProfileId(id === 'me' ? user?.id || null : id);
+        } else if (username) {
+            const { data } = await supabase.from('profiles').select('id').eq('username', username).maybeSingle();
+            setResolvedProfileId(data?.id || null);
+        }
+        setProfileLoading(false);
+    };
+    resolveId();
+  }, [id, username, authLoading, user]);
+
   const isOnline = resolvedProfileId ? isUserOnline(resolvedProfileId) : false;
 
   useEffect(() => {
@@ -64,7 +83,7 @@ export default function UserProfilePage() {
   };
 
   const handleShare = async () => {
-    const profileUrl = `${window.location.origin}/profile/${resolvedProfileId}`;
+    const profileUrl = `${window.location.origin}/u/${profile.username}`;
     if (navigator.share) {
         try {
             await navigator.share({

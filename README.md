@@ -2,11 +2,11 @@
 
 VoiceID is a secure, username-based communication platform that allows users to connect, message, and talk without sharing their personal phone numbers.
 
-## V1 Features
+## Core V1 Features
 
-- Authentication
-- VoiceID/user profiles
-- Profile avatars
+- Authentication (Google OAuth)
+- VoiceID/user profiles (with username-based URLs)
+- Profile avatars (Cloudinary)
 - User search
 - Contacts/friends
 - Realtime text messaging
@@ -14,6 +14,7 @@ VoiceID is a secure, username-based communication platform that allows users to 
 - Realtime notifications
 - Online presence
 - WebRTC voice calling
+- Privacy-focused: No phone number required
 
 ## Technology Stack
 
@@ -51,6 +52,3 @@ npm run dev
 
 Production domain: https://voiceid.online
 
-## V1 Status
-
-V1 functionality is fully implemented and verified.
