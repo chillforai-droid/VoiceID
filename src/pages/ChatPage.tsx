@@ -17,6 +17,8 @@ export default function ChatPage() {
   const { initiateCall, canCallUser } = useVoiceCall();
   const { isUserOnline } = usePresence();
   const [messages, setMessages] = useState<any[]>([]);
+  const [editingMessage, setEditingMessage] = useState<any>(null);
+  const [editContent, setEditContent] = useState('');
   const [newMessage, setNewMessage] = useState('');
   const [messagesLoading, setMessagesLoading] = useState(true);
   const [isPreviewMode, setIsPreviewMode] = useState(false);
@@ -56,15 +58,16 @@ export default function ChatPage() {
     const subscription = supabase
       .channel(`messages:${id}`)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `conversation_id=eq.${id}` }, (payload) => {
-        console.log("Realtime INSERT received:", payload);
         setMessages(prev => {
-          if (prev.find(m => m.id === payload.new.id)) {
-            console.log("Duplicate message skipped:", payload.new.id);
-            return prev;
-          }
-          console.log("Appending realtime message:", payload.new.id);
+          if (prev.find(m => m.id === payload.new.id)) return prev;
           return [...prev, payload.new].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
         });
+      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'messages', filter: `conversation_id=eq.${id}` }, (payload) => {
+        setMessages(prev => prev.map(m => m.id === payload.new.id ? payload.new : m));
+      })
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'messages', filter: `conversation_id=eq.${id}` }, (payload) => {
+        setMessages(prev => prev.filter(m => m.id !== payload.old.id));
       })
       .subscribe((status) => {
         console.log("Realtime subscription status:", status);
@@ -88,15 +91,26 @@ export default function ChatPage() {
     
     if (error) {
         console.error('Message insert error:', error);
-        alert(`Failed to save message. Details: ${error.message} - ${error.details || ''}`);
+        alert(`Failed to save message. Details: ${error.message}`);
     } else {
-        console.log("Message inserted:", data.id);
         setNewMessage('');
-        // We do NOT need to append here if realtime works, but it's safer for UX to append immediately
-        setMessages(prev => {
-           if (prev.find(m => m.id === data.id)) return prev;
-           return [...prev, data];
-        });
+    }
+  };
+
+  const deleteMessage = async (messageId: string) => {
+    if (!confirm('Are you sure you want to delete this message?')) return;
+    const { error } = await supabase.from('messages').delete().eq('id', messageId);
+    if (error) alert('Failed to delete message: ' + error.message);
+  };
+
+  const updateMessage = async () => {
+    if (!editingMessage || !editContent.trim()) return;
+    const { error } = await supabase.from('messages').update({ content_body: editContent }).eq('id', editingMessage.id);
+    if (error) {
+        alert('Failed to update message: ' + error.message);
+    } else {
+        setEditingMessage(null);
+        setEditContent('');
     }
   };
 
@@ -125,13 +139,29 @@ export default function ChatPage() {
       
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
         {messages.map((m) => (
-          <div key={m.id} className={`flex ${m.sender_id === user?.id ? 'justify-end' : 'justify-start'}`}>
+          <div key={m.id} className={`flex group ${m.sender_id === user?.id ? 'justify-end' : 'justify-start'}`}>
             <div className={`p-3 px-4 rounded-2xl max-w-[85%] ${m.sender_id === user?.id ? 'bg-blue-600 text-white rounded-tr-sm' : 'bg-white text-gray-900 rounded-tl-sm border border-gray-100'}`}>
-              {m.content_type === 'voice' ? <VoiceMessage message={m} /> : m.content_body}
-              <p className={`text-[10px] mt-1 ${m.sender_id === user?.id ? 'text-blue-100' : 'text-gray-400'}`}>
-                {new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-              </p>
+              {editingMessage?.id === m.id ? (
+                <div className='flex gap-2 items-center'>
+                    <input value={editContent} onChange={e => setEditContent(e.target.value)} className='text-black p-1 rounded'/>
+                    <button onClick={updateMessage} className='text-xs bg-white text-blue-600 px-2 py-1 rounded'>Save</button>
+                    <button onClick={() => setEditingMessage(null)} className='text-xs text-blue-100'>Cancel</button>
+                </div>
+              ) : (
+                <>
+                    {m.content_type === 'voice' ? <VoiceMessage message={m} /> : m.content_body}
+                    <p className={`text-[10px] mt-1 ${m.sender_id === user?.id ? 'text-blue-100' : 'text-gray-400'}`}>
+                        {new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </p>
+                </>
+              )}
             </div>
+            {m.sender_id === user?.id && !editingMessage && m.content_type === 'text' && (
+                <div className="hidden group-hover:flex items-center gap-1 ml-2">
+                    <button onClick={() => { setEditingMessage(m); setEditContent(m.content_body); }} className="text-xs text-gray-500 hover:text-gray-800">Edit</button>
+                    <button onClick={() => deleteMessage(m.id)} className="text-xs text-red-500 hover:text-red-800">Delete</button>
+                </div>
+            )}
           </div>
         ))}
         <div ref={scrollRef} />
