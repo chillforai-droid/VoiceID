@@ -3,9 +3,12 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { useNotifications } from '../context/NotificationContext';
-import { Send, Loader2, ArrowLeft, Phone } from 'lucide-react';
+import { Send, Loader2, ArrowLeft, Phone, Image as ImageIcon } from 'lucide-react';
+import { ImageMessage } from '../components/chat/ImageMessage';
 import { VoiceRecorder } from '../components/chat/VoiceRecorder';
 import { VoiceMessage } from '../components/chat/VoiceMessage';
+import { ConfirmDialog } from '../components/chat/ConfirmDialog';
+import { MediaCache } from '../lib/MediaCache';
 import { useVoiceCall } from '../hooks/useVoiceCall';
 import { usePresence } from '../context/PresenceContext';
 
@@ -19,11 +22,85 @@ export default function ChatPage() {
   const [messages, setMessages] = useState<any[]>([]);
   const [editingMessage, setEditingMessage] = useState<any>(null);
   const [editContent, setEditContent] = useState('');
+  const [messageToDelete, setMessageToDelete] = useState<any>(null);
+  const [selectedMessageId, setSelectedMessageId] = useState<string | null>(null);
   const [newMessage, setNewMessage] = useState('');
   const [messagesLoading, setMessagesLoading] = useState(true);
   const [isPreviewMode, setIsPreviewMode] = useState(false);
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
   const [otherUser, setOtherUser] = useState<any>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    console.log("handleImageUpload: file selected", file);
+    if (!file || !user || !id) return;
+    
+    // Reset file input
+    e.target.value = '';
+    
+    // Set preview
+    setPreviewImage(URL.createObjectURL(file));
+    
+    console.log("handleImageUpload: starting upload");
+    const arrayBuffer = await file.arrayBuffer();
+    const hashBuffer = await crypto.subtle.digest('SHA-256', arrayBuffer);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    const sha256 = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+
+    const session = await supabase.auth.getSession();
+    const token = session.data.session?.access_token;
+    
+    console.log("handleImageUpload: calling proxy upload");
+    const uploadRes = await fetch("/api/media/upload", {
+      method: "POST",
+      headers: { 
+        "Content-Type": file.type,
+        "Authorization": `Bearer ${token}` 
+      },
+      body: file,
+    });
+    
+    if (!uploadRes.ok) {
+        console.error("handleImageUpload: proxy upload failed", await uploadRes.text());
+        throw new Error("Failed to upload to storage");
+    }
+    
+    const { objectKey } = await uploadRes.json();
+    console.log("handleImageUpload: upload response", { objectKey });
+    
+    console.log("handleImageUpload: inserting metadata to Supabase");
+    const { data: message, error: dbError } = await supabase.from('messages').insert({
+        conversation_id: id,
+        sender_id: user.id,
+        content_body: '',
+        content_type: 'image',
+        b2_object_key: objectKey,
+        sha256: sha256,
+        media_status: 'delivered', // Change to delivered
+        mime_type: file.type,
+        byte_size: file.size
+    }).select().single();
+    
+    if (dbError) {
+        console.error('Image message insert error:', dbError);
+    } else {
+        console.log("handleImageUpload: inserted metadata to Supabase", message);
+        // Cache the blob
+        await MediaCache.putMedia({
+            messageId: message.id,
+            mediaType: 'image',
+            blob: file,
+            mimeType: file.type,
+            byteSize: file.size,
+            createdAt: Date.now(),
+            sha256: sha256,
+            deliveryStatus: 'delivered'
+        });
+        setPreviewImage(null);
+    }
+  };
 
   const handleCall = async () => {
       if (!otherUser?.user_id) return;
@@ -97,18 +174,42 @@ export default function ChatPage() {
     }
   };
 
-  const deleteMessage = async (messageId: string) => {
-    if (!confirm('Are you sure you want to delete this message?')) return;
-    const { error } = await supabase.from('messages').delete().eq('id', messageId);
-    if (error) alert('Failed to delete message: ' + error.message);
+  const deleteMessage = async (m: any) => {
+    const session = await supabase.auth.getSession();
+    const token = session.data.session?.access_token;
+    
+    const { error } = await supabase.from('messages').delete().eq('id', m.id);
+    if (error) { 
+        alert('Failed to delete message: ' + error.message); 
+        return; 
+    }
+    
+    if (m.b2_object_key) {
+        await fetch(`/api/media/delete/${m.b2_object_key}`, {
+            method: 'DELETE',
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+    }
+    await MediaCache.deleteMedia(m.id);
+    setMessages(prev => prev.filter(msg => msg.id !== m.id));
   };
 
   const updateMessage = async () => {
     if (!editingMessage || !editContent.trim()) return;
-    const { error } = await supabase.from('messages').update({ content_body: editContent }).eq('id', editingMessage.id);
+    const { error } = await supabase.from('messages').update({ content_body: editContent + " (edited)" }).eq('id', editingMessage.id);
     if (error) {
         alert('Failed to update message: ' + error.message);
     } else {
+        setMessages(prev =>
+            prev.map(msg =>
+                msg.id === editingMessage.id
+                ? {
+                    ...msg,
+                    content_body: editContent + " (edited)"
+                }
+                : msg
+            )
+        );
         setEditingMessage(null);
         setEditContent('');
     }
@@ -139,27 +240,29 @@ export default function ChatPage() {
       
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
         {messages.map((m) => (
-          <div key={m.id} className={`flex group ${m.sender_id === user?.id ? 'justify-end' : 'justify-start'}`}>
+          <div key={m.id} className={`flex flex-col ${m.sender_id === user?.id ? 'items-end' : 'items-start'} group`} onClick={() => setSelectedMessageId(selectedMessageId === m.id ? null : m.id)}>
             <div className={`p-3 px-4 rounded-2xl max-w-[85%] ${m.sender_id === user?.id ? 'bg-blue-600 text-white rounded-tr-sm' : 'bg-white text-gray-900 rounded-tl-sm border border-gray-100'}`}>
               {editingMessage?.id === m.id ? (
-                <div className='flex gap-2 items-center'>
+                <div className='flex gap-2 items-center' onClick={e => e.stopPropagation()}>
                     <input value={editContent} onChange={e => setEditContent(e.target.value)} className='text-black p-1 rounded'/>
-                    <button onClick={updateMessage} className='text-xs bg-white text-blue-600 px-2 py-1 rounded'>Save</button>
-                    <button onClick={() => setEditingMessage(null)} className='text-xs text-blue-100'>Cancel</button>
+                    <button onClick={e => { e.stopPropagation(); updateMessage(); }} className='text-xs bg-white text-blue-600 px-2 py-1 rounded'>Save</button>
+                    <button onClick={e => { e.stopPropagation(); setEditingMessage(null); }} className='text-xs text-blue-100'>Cancel</button>
                 </div>
               ) : (
                 <>
-                    {m.content_type === 'voice' ? <VoiceMessage message={m} /> : m.content_body}
+                    {m.content_type === 'voice' ? <VoiceMessage message={m} /> : (m.content_type === 'image' ? <ImageMessage message={m} /> : m.content_body)}
                     <p className={`text-[10px] mt-1 ${m.sender_id === user?.id ? 'text-blue-100' : 'text-gray-400'}`}>
                         {new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                     </p>
                 </>
               )}
             </div>
-            {m.sender_id === user?.id && !editingMessage && m.content_type === 'text' && (
-                <div className="hidden group-hover:flex items-center gap-1 ml-2">
-                    <button onClick={() => { setEditingMessage(m); setEditContent(m.content_body); }} className="text-xs text-gray-500 hover:text-gray-800">Edit</button>
-                    <button onClick={() => deleteMessage(m.id)} className="text-xs text-red-500 hover:text-red-800">Delete</button>
+            {m.sender_id === user?.id && !editingMessage && selectedMessageId === m.id && (
+                <div className="flex items-center gap-3 mt-1 px-1" onClick={e => e.stopPropagation()}>
+                    {m.content_type === 'text' && (
+                        <button onClick={e => { e.stopPropagation(); setEditingMessage(m); setEditContent(m.content_body.replace(" (edited)", "")); setSelectedMessageId(null); }} className="text-xs text-blue-600 font-medium hover:text-blue-800">Edit</button>
+                    )}
+                    <button onClick={e => { e.stopPropagation(); setMessageToDelete(m); setSelectedMessageId(null); }} className="text-xs text-red-600 font-medium hover:text-red-800">Delete</button>
                 </div>
             )}
           </div>
@@ -167,8 +270,31 @@ export default function ChatPage() {
         <div ref={scrollRef} />
       </div>
       
+      <ConfirmDialog
+        isOpen={!!messageToDelete}
+        title="Delete Message"
+        message="Are you sure you want to delete this message?"
+        onConfirm={async () => {
+            await deleteMessage(messageToDelete);
+            setMessageToDelete(null);
+        }}
+        onCancel={() => setMessageToDelete(null)}
+      />
+      
+      {previewImage && (
+        <div className="p-2 border-t bg-white">
+          <img src={previewImage} alt="Preview" className="h-20 rounded" />
+          <button onClick={() => setPreviewImage(null)}>Cancel</button>
+        </div>
+      )}
+      
       <form onSubmit={sendMessage} className="p-4 bg-white border-t flex gap-2 w-full items-center">
+        <>
         <VoiceRecorder onSent={() => {}} onAudioPreview={(isPreview) => setIsPreviewMode(isPreview)} />
+        <button type="button" onClick={() => fileInputRef.current?.click()} className="p-3 hover:bg-gray-100 rounded-full flex-shrink-0 text-gray-500">
+            <ImageIcon size={20} />
+        </button>
+        <input type="file" ref={fileInputRef} onChange={handleImageUpload} accept="image/*" className="hidden" />
         {!isPreviewMode && (
           <>
             <input 
@@ -180,6 +306,7 @@ export default function ChatPage() {
             <button type="submit" disabled={!newMessage.trim()} className="p-3 bg-blue-600 text-white rounded-full flex-shrink-0 disabled:opacity-50"><Send size={20} /></button>
           </>
         )}
+        </>
       </form>
     </div>
   );

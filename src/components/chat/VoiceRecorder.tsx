@@ -86,19 +86,54 @@ export function VoiceRecorder({ onSent, onAudioPreview }: { onSent: () => void, 
 
   const sendAudio = async () => {
     if (!audioBlob || !id || !user) return;
-    const messageId = crypto.randomUUID();
-    const filePath = `${id}/${messageId}/voice.webm`;
     
-    // 1. Insert metadata
+    // 1. Calculate Hash
+    const arrayBuffer = await audioBlob.arrayBuffer();
+    const hashBuffer = await crypto.subtle.digest('SHA-256', arrayBuffer);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    const sha256 = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+
+    // 2. Request Authorization
+    const session = await supabase.auth.getSession();
+    const token = session.data.session?.access_token;
+    
+    const authRes = await fetch("/api/media/upload-auth", {
+      method: "POST",
+      headers: { 
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${token}` 
+      },
+      body: JSON.stringify({ mimeType: audioBlob.type }),
+    });
+    
+    const { url, objectKey } = await authRes.json();
+    
+    // 3. Upload directly to B2
+    const uploadRes = await fetch(url, {
+        method: "PUT",
+        body: audioBlob,
+        headers: { "Content-Type": audioBlob.type }
+    });
+    
+    if (!uploadRes.ok) {
+        setError('Failed to upload audio.');
+        return;
+    }
+    
+    // 4. Insert metadata
+    const messageId = crypto.randomUUID();
     const { error: dbError } = await supabase.from('messages').insert({
         id: messageId,
         conversation_id: id,
         sender_id: user.id,
         content_body: '',
         content_type: 'voice',
-        storage_path: filePath,
+        b2_object_key: objectKey,
+        sha256: sha256,
+        media_status: 'pending',
         duration: duration,
-        mime_type: audioBlob.type
+        mime_type: audioBlob.type,
+        byte_size: audioBlob.size
     });
     
     if (dbError) {
@@ -106,11 +141,6 @@ export function VoiceRecorder({ onSent, onAudioPreview }: { onSent: () => void, 
         setError('Failed to save message.'); 
         return; 
     }
-
-    // 2. Upload
-    const { error: uploadError } = await supabase.storage.from('voice-messages-temp').upload(filePath, audioBlob);
-    
-    if (uploadError) { console.error('Storage error:', uploadError); setError('Failed to upload audio.'); return; }
     
     setAudioBlob(null);
     onSent();

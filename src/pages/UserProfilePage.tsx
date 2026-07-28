@@ -105,7 +105,7 @@ export default function UserProfilePage() {
   };
 
   const handleContactAction = async (action: 'add' | 'accept' | 'reject' | 'remove' | 'block' | 'unblock') => {
-    if (!user) return;
+    if (!user || user.id === resolvedProfileId) return;
     
     let error;
     if (action === 'add') {

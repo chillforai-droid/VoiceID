@@ -2,42 +2,114 @@ import express from "express";
 import path from "path";
 import { createServer as createViteServer } from "vite";
 import crypto from "crypto";
+import { PutObjectCommand, GetObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+import { getS3Client } from "./src/lib/b2";
+import { createClient } from "@supabase/supabase-js";
 
 async function startServer() {
+  const supabaseAdmin = createClient(
+      process.env.SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
   const app = express();
   const PORT = 3000;
 
   app.use(express.json());
 
+  // Helper: Verify Auth
+  const verifyAuth = async (req: express.Request) => {
+    const authHeader = req.headers.authorization;
+    if (!authHeader) return null;
+    const { data: { user }, error } = await supabaseAdmin.auth.getUser(authHeader.replace("Bearer ", ""));
+    if (error || !user) return null;
+    return user;
+  };
+
   // API routes
-  app.post("/api/cloudinary-sign", (req, res) => {
-    console.log("Cloudinary sign request body:", req.body);
-    const { timestamp, folder, public_id } = req.body;
-    const apiSecret = process.env.CLOUDINARY_API_SECRET;
-    const apiKey = process.env.CLOUDINARY_API_KEY;
+  app.delete("/api/media/delete/:objectKey", async (req, res) => {
+    const user = await verifyAuth(req);
+    if (!user) return res.status(401).json({ error: "Unauthorized" });
+    
+    await getS3Client().send(new DeleteObjectCommand({
+        Bucket: process.env.B2_BUCKET_NAME,
+        Key: req.params.objectKey,
+    }));
+    
+    res.json({ success: true });
+  });
 
-    if (!apiSecret || !apiKey) {
-      console.error("Cloudinary configuration missing");
-      return res.status(500).json({ error: 'Cloudinary configuration missing' });
+  app.post("/api/media/upload", express.raw({ type: '*/*', limit: '10mb' }), async (req, res) => {
+    const user = await verifyAuth(req);
+    if (!user) return res.status(401).json({ error: "Unauthorized" });
+
+    const objectKey = crypto.randomUUID();
+    const command = new PutObjectCommand({
+      Bucket: process.env.B2_BUCKET_NAME,
+      Key: objectKey,
+      ContentType: req.headers['content-type'],
+      Body: req.body,
+    });
+    
+    await getS3Client().send(command);
+    res.json({ objectKey });
+  });
+
+  app.post("/api/media/upload-auth", async (req, res) => {
+    const user = await verifyAuth(req);
+    if (!user) return res.status(401).json({ error: "Unauthorized" });
+
+    const { mimeType } = req.body;
+    const objectKey = crypto.randomUUID();
+    const command = new PutObjectCommand({
+      Bucket: process.env.B2_BUCKET_NAME,
+      Key: objectKey,
+      ContentType: mimeType,
+    });
+    
+    const url = await getSignedUrl(getS3Client(), command, { expiresIn: 3600 });
+    res.json({ url, objectKey });
+  });
+
+  app.post("/api/media/download-auth", async (req, res) => {
+    const user = await verifyAuth(req);
+    if (!user) return res.status(401).json({ error: "Unauthorized" });
+
+    const { messageId } = req.body;
+    const { data: message } = await supabaseAdmin.from("messages").select("*, conversations!inner(*)").eq("id", messageId).single();
+    
+    if (!message || message.conversations.user_id !== user.id) {
+        return res.status(403).json({ error: "Forbidden" });
     }
 
-    const params: Record<string, any> = {
-      timestamp,
-      folder,
-      public_id,
-    };
+    const command = new GetObjectCommand({
+        Bucket: process.env.B2_BUCKET_NAME,
+        Key: message.b2_object_key,
+    });
+    
+    const url = await getSignedUrl(getS3Client(), command, { expiresIn: 3600 });
+    res.json({ url });
+  });
 
-    if (!timestamp || !folder || !public_id) {
-      console.error("Missing required parameters", params);
-      return res.status(400).json({ error: 'Missing required parameters' });
+  app.post("/api/media/ack", async (req, res) => {
+    const user = await verifyAuth(req);
+    if (!user) return res.status(401).json({ error: "Unauthorized" });
+
+    const { messageId } = req.body;
+    const { data: message } = await supabaseAdmin.from("messages").select("*").eq("id", messageId).single();
+    
+    if (!message || message.sender_id === user.id) {
+        return res.status(403).json({ error: "Forbidden" });
     }
 
-    const signature = crypto
-      .createHash('sha1')
-      .update(Object.keys(params).sort().map(key => `${key}=${params[key]}`).join('&') + apiSecret)
-      .digest('hex');
+    await getS3Client().send(new DeleteObjectCommand({
+        Bucket: process.env.B2_BUCKET_NAME,
+        Key: message.b2_object_key,
+    }));
 
-    res.json({ signature, apiKey });
+    await supabaseAdmin.from("messages").update({ media_status: "delivered" }).eq("id", messageId);
+    
+    res.json({ success: true });
   });
 
   // Vite middleware
