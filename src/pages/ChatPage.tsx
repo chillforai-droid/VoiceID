@@ -175,14 +175,25 @@ export default function ChatPage() {
   };
 
   const deleteMessage = async (m: any) => {
+    console.log("DEBUG_DELETE: messageId:", m.id, "messageConvId:", m.conversation_id, "urlConvId:", id);
     const session = await supabase.auth.getSession();
     const token = session.data.session?.access_token;
     
-    const { error } = await supabase.from('messages').delete().eq('id', m.id);
+    const { data: deleteData, error } = await supabase
+        .from('messages')
+        .delete()
+        .eq('id', m.id);
+    
+    console.log("DEBUG_DELETE: Supabase delete result:", { error, deleteData });
+
     if (error) { 
+        console.error("Delete failed", error);
         alert('Failed to delete message: ' + error.message); 
         return; 
     }
+    
+    const { data: verifyData } = await supabase.from('messages').select('id').eq('id', m.id);
+    console.log("DEBUG_DELETE: Verification SELECT (should be empty array):", verifyData);
     
     if (m.b2_object_key) {
         await fetch(`/api/media/delete/${m.b2_object_key}`, {

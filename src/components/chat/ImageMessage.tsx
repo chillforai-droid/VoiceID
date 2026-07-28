@@ -27,13 +27,26 @@ export function ImageMessage({ message }: { message: any }) {
                 },
                 body: JSON.stringify({ messageId: message.id }),
             });
+            
+            if (!res.ok) {
+                console.error("ImageMessage: Auth fetch failed", res.status);
+                setLoading(false);
+                return;
+            }
+            
             const { url: downloadUrl } = await res.json();
             if (!downloadUrl) {
                 console.error("ImageMessage: Invalid download URL", downloadUrl);
                 setLoading(false);
                 return;
             }
+            
             const blobRes = await fetch(downloadUrl);
+            if (!blobRes.ok) {
+                console.error("ImageMessage: Blob fetch failed", blobRes.status);
+                setLoading(false);
+                return;
+            }
             const blob = await blobRes.blob();
             
             // Verify hash and size
@@ -56,6 +69,7 @@ export function ImageMessage({ message }: { message: any }) {
         loadMedia();
     }, [message]);
 
-    if (loading) return <div className="p-4">Loading...</div>;
+    if (loading) return <div className="p-4 text-xs text-gray-400">Loading...</div>;
+    if (!url) return <div className="p-4 text-xs text-red-500">Failed to load image.</div>;
     return <img src={url!} alt="message" className="max-w-xs rounded" />;
 }
