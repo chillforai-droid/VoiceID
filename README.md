@@ -1,6 +1,6 @@
 # VoiceID
 
-VoiceID is a secure, username-based communication platform that allows users to connect, message, and talk without sharing their personal phone numbers.
+VoiceID is a secure, username-based communication platform that allows users to connect, message, and talk without sharing their personal phone numbers. 100% Free
 
 ## Core V1 Features
 
