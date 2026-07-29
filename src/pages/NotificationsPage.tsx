@@ -43,18 +43,18 @@ export default function NotificationsPage() {
   if (loading) return <div className="flex justify-center p-20"><Loader2 className="animate-spin text-blue-500" size={32}/></div>;
 
   return (
-    <div className="max-w-xl mx-auto space-y-8">
+    <div className="max-w-xl mx-auto space-y-6 sm:space-y-8 p-4">
       <h1 className="text-2xl font-bold">Notifications</h1>
       
       <div className="space-y-4">
         <h2 className="text-lg font-semibold">Contact Requests</h2>
         {requests.length === 0 ? <p className="text-gray-500">No new requests.</p> :
         requests.map(req => (
-            <div key={req.id} className="flex items-center justify-between p-4 bg-white border border-gray-100 rounded-2xl">
-                <p>{req.profiles.display_name} sent you a request.</p>
-                <div className="flex gap-2">
-                    <button onClick={() => handleAction(req.id, 'accepted')} className="p-2 bg-green-50 text-green-600 rounded-full"><Check /></button>
-                    <button onClick={() => handleAction(req.id, 'rejected')} className="p-2 bg-red-50 text-red-600 rounded-full"><X /></button>
+            <div key={req.id} className="flex items-center justify-between gap-3 p-4 bg-white border border-gray-100 rounded-2xl">
+                <p className="min-w-0 break-words">{req.profiles.display_name} sent you a request.</p>
+                <div className="flex gap-2 shrink-0">
+                    <button onClick={() => handleAction(req.id, 'accepted')} className="p-2 bg-green-50 text-green-600 rounded-full" aria-label="Accept request"><Check /></button>
+                    <button onClick={() => handleAction(req.id, 'rejected')} className="p-2 bg-red-50 text-red-600 rounded-full" aria-label="Reject request"><X /></button>
                 </div>
             </div>
         ))}
@@ -65,10 +65,10 @@ export default function NotificationsPage() {
         {notifications.length === 0 ? <p className="text-gray-500">No notifications.</p> :
         notifications.map(notif => (
             <div key={notif.id} className="flex items-center gap-4 p-4 bg-white border border-gray-100 rounded-2xl">
-                <Bell className="text-blue-500" />
-                <div>
-                    <p className="font-semibold">{notif.title}</p>
-                    <p className="text-sm text-gray-600">{notif.message}</p>
+                <Bell className="text-blue-500 shrink-0" />
+                <div className="min-w-0">
+                    <p className="font-semibold break-words">{notif.title}</p>
+                    <p className="text-sm text-gray-600 break-words">{notif.message}</p>
                 </div>
             </div>
         ))}

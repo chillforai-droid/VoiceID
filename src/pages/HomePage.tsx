@@ -14,16 +14,16 @@ export default function HomePage() {
 
   return (
     <div className="max-w-xl mx-auto space-y-8 p-4">
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-4 min-w-0">
         {profile?.avatar_url ? (
-          <img src={profile.avatar_url} alt={displayName} className="w-16 h-16 rounded-full" />
+          <img src={profile.avatar_url} alt={displayName} className="w-16 h-16 rounded-full object-cover shrink-0" />
         ) : (
-          <div className="w-16 h-16 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-xl font-bold">
+          <div className="w-16 h-16 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-xl font-bold shrink-0">
             {displayName.charAt(0).toUpperCase()}
           </div>
         )}
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Hello, {displayName}</h1>
+        <div className="min-w-0">
+          <h1 className="text-2xl font-bold text-gray-900 truncate">Hello, {displayName}</h1>
           <p className="text-gray-500">How's your voice today?</p>
         </div>
       </div>

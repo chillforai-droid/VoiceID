@@ -26,13 +26,13 @@ export default function ContactPage() {
     return (
         <div className="min-h-screen flex flex-col bg-white">
             <Navbar />
-            <main className="flex-grow pt-32 pb-20 px-6 max-w-2xl mx-auto">
+            <main className="flex-grow pt-28 sm:pt-32 pb-16 sm:pb-20 px-4 sm:px-6 max-w-2xl mx-auto">
                 <h1 className="text-4xl font-extrabold tracking-tighter mb-6">Contact VoiceID</h1>
                 <p className="text-lg text-gray-600 mb-8">Need help, have a question, or want to report a problem? Contact the VoiceID team by email.</p>
 
-                <div className="bg-gray-50 p-8 rounded-3xl border border-gray-100 mb-8">
-                    <p className="text-2xl font-bold mb-6">{email}</p>
-                    <div className="flex gap-4">
+                <div className="bg-gray-50 p-6 sm:p-8 rounded-3xl border border-gray-100 mb-8">
+                    <p className="text-lg sm:text-2xl font-bold mb-6 break-all">{email}</p>
+                    <div className="flex flex-wrap gap-3 sm:gap-4">
                         <a href={`mailto:${email}?subject=VoiceID%20Support%20Request`} className="px-6 py-3 bg-blue-600 text-white rounded-full flex items-center gap-2 hover:bg-blue-700">
                             <Mail size={18} /> Email Support
                         </a>

@@ -6,9 +6,9 @@ export default function PrivacyPolicy() {
   return (
     <div className="min-h-screen flex flex-col">
       <Navbar />
-      <main className="flex-grow pt-32 pb-20 px-6 max-w-4xl mx-auto">
-        <h1 className="text-5xl font-extrabold tracking-tighter mb-8">Privacy Policy</h1>
-        <div className="space-y-8 text-gray-700 text-lg leading-relaxed">
+      <main className="flex-grow pt-28 sm:pt-32 pb-16 sm:pb-20 px-4 sm:px-6 max-w-4xl mx-auto">
+        <h1 className="text-3xl sm:text-5xl font-extrabold tracking-tighter mb-8">Privacy Policy</h1>
+        <div className="space-y-8 text-gray-700 text-base sm:text-lg leading-relaxed">
           <p>Last Updated: July 25, 2026</p>
           <p>At VoiceID, your privacy is our core product, not a feature. We do not store your phone number, and we do not sell your personal data. This policy outlines how we handle the minimal information we do collect to provide our service.</p>
           

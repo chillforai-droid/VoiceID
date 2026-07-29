@@ -219,37 +219,44 @@ export default function ChatPage() {
 
   return (
     <div className="flex flex-col h-full bg-gray-50">
-      <div className="sticky top-0 bg-white border-b border-gray-200 p-4 flex items-center gap-3 z-10">
-        <button onClick={() => navigate('/dashboard/messages')} className="p-2 hover:bg-gray-100 rounded-full">
+      <div className="pt-safe sticky top-0 bg-white border-b border-gray-200 p-3 sm:p-4 flex items-center gap-2 sm:gap-3 z-10">
+        <button onClick={() => navigate('/dashboard/messages')} className="p-2 hover:bg-gray-100 rounded-full shrink-0" aria-label="Back to conversations">
             <ArrowLeft size={20} className="text-gray-600" />
         </button>
-        <div className="w-10 h-10 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold overflow-hidden">
-             {otherUser?.profiles?.avatar_url ? <img src={otherUser.profiles.avatar_url} alt="" /> : otherUser?.profiles?.display_name?.charAt(0)}
+        <div className="w-10 h-10 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold overflow-hidden shrink-0">
+             {otherUser?.profiles?.avatar_url ? <img src={otherUser.profiles.avatar_url} alt="" className="w-full h-full object-cover" /> : otherUser?.profiles?.display_name?.charAt(0)}
         </div>
-        <div className="flex-1 font-semibold text-gray-900">{otherUser?.profiles?.display_name || 'Conversation'}</div>
+        <div className="flex-1 min-w-0 font-semibold text-gray-900 truncate">{otherUser?.profiles?.display_name || 'Conversation'}</div>
         {otherUser && (
-            <div className="flex items-center gap-2">
-                <button onClick={handleCall} className={`p-2 hover:bg-gray-100 rounded-full ${!isUserOnline(otherUser.user_id) ? 'text-gray-400' : 'text-gray-600'}`}>
+            <div className="flex items-center gap-2 shrink-0">
+                <button onClick={handleCall} className={`p-2 hover:bg-gray-100 rounded-full ${!isUserOnline(otherUser.user_id) ? 'text-gray-400' : 'text-gray-600'}`} aria-label="Call">
                     <Phone size={20} />
                 </button>
-                <div className={`w-2 h-2 rounded-full ${isUserOnline(otherUser.user_id) ? 'bg-green-500' : 'bg-gray-300'}`} />
+                <div className={`w-2 h-2 rounded-full shrink-0 ${isUserOnline(otherUser.user_id) ? 'bg-green-500' : 'bg-gray-300'}`} />
             </div>
         )}
       </div>
       
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+      <div className="flex-1 overflow-y-auto overflow-x-hidden p-3 sm:p-4 space-y-3 sm:space-y-4">
         {messages.map((m) => (
           <div key={m.id} className={`flex flex-col ${m.sender_id === user?.id ? 'items-end' : 'items-start'} group`} onClick={() => setSelectedMessageId(selectedMessageId === m.id ? null : m.id)}>
-            <div className={`p-3 px-4 rounded-2xl max-w-[85%] ${m.sender_id === user?.id ? 'bg-blue-600 text-white rounded-tr-sm' : 'bg-white text-gray-900 rounded-tl-sm border border-gray-100'}`}>
+            <div className={`p-3 px-4 rounded-2xl max-w-[88%] sm:max-w-[75%] md:max-w-[65%] break-words ${m.sender_id === user?.id ? 'bg-blue-600 text-white rounded-tr-sm' : 'bg-white text-gray-900 rounded-tl-sm border border-gray-100'}`}>
               {editingMessage?.id === m.id ? (
-                <div className='flex gap-2 items-center' onClick={e => e.stopPropagation()}>
-                    <input value={editContent} onChange={e => setEditContent(e.target.value)} className='text-black p-1 rounded'/>
-                    <button onClick={e => { e.stopPropagation(); updateMessage(); }} className='text-xs bg-white text-blue-600 px-2 py-1 rounded'>Save</button>
-                    <button onClick={e => { e.stopPropagation(); setEditingMessage(null); }} className='text-xs text-blue-100'>Cancel</button>
+                <div className='flex flex-wrap gap-2 items-center' onClick={e => e.stopPropagation()}>
+                    <input
+                      value={editContent}
+                      onChange={e => setEditContent(e.target.value)}
+                      autoFocus
+                      className='text-black p-2 rounded-lg min-w-0 flex-1 outline-none focus:ring-2 focus:ring-white/50'
+                    />
+                    <div className="flex gap-2 shrink-0">
+                      <button onClick={e => { e.stopPropagation(); updateMessage(); }} className='text-xs bg-white text-blue-600 px-3 py-1.5 rounded-full font-medium'>Save</button>
+                      <button onClick={e => { e.stopPropagation(); setEditingMessage(null); }} className='text-xs text-blue-100 px-2 py-1.5'>Cancel</button>
+                    </div>
                 </div>
               ) : (
                 <>
-                    {m.content_type === 'voice' ? <VoiceMessage message={m} /> : (m.content_type === 'image' ? <ImageMessage message={m} /> : m.content_body)}
+                    {m.content_type === 'voice' ? <VoiceMessage message={m} /> : (m.content_type === 'image' ? <ImageMessage message={m} /> : <span className="whitespace-pre-wrap [overflow-wrap:anywhere]">{m.content_body}</span>)}
                     <p className={`text-[10px] mt-1 ${m.sender_id === user?.id ? 'text-blue-100' : 'text-gray-400'}`}>
                         {new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                     </p>
@@ -257,11 +264,11 @@ export default function ChatPage() {
               )}
             </div>
             {m.sender_id === user?.id && !editingMessage && selectedMessageId === m.id && (
-                <div className="flex items-center gap-3 mt-1 px-1" onClick={e => e.stopPropagation()}>
+                <div className="flex items-center gap-4 mt-1 px-1" onClick={e => e.stopPropagation()}>
                     {m.content_type === 'text' && (
-                        <button onClick={e => { e.stopPropagation(); setEditingMessage(m); setEditContent(m.content_body.replace(" (edited)", "")); setSelectedMessageId(null); }} className="text-xs text-blue-600 font-medium hover:text-blue-800">Edit</button>
+                        <button onClick={e => { e.stopPropagation(); setEditingMessage(m); setEditContent(m.content_body.replace(" (edited)", "")); setSelectedMessageId(null); }} className="text-xs text-blue-600 font-medium hover:text-blue-800 py-1">Edit</button>
                     )}
-                    <button onClick={e => { e.stopPropagation(); setMessageToDelete(m); setSelectedMessageId(null); }} className="text-xs text-red-600 font-medium hover:text-red-800">Delete</button>
+                    <button onClick={e => { e.stopPropagation(); setMessageToDelete(m); setSelectedMessageId(null); }} className="text-xs text-red-600 font-medium hover:text-red-800 py-1">Delete</button>
                 </div>
             )}
           </div>
@@ -281,16 +288,16 @@ export default function ChatPage() {
       />
       
       {previewImage && (
-        <div className="p-2 border-t bg-white">
-          <img src={previewImage} alt="Preview" className="h-20 rounded" />
-          <button onClick={() => setPreviewImage(null)}>Cancel</button>
+        <div className="p-2 border-t bg-white flex items-center gap-3">
+          <img src={previewImage} alt="Preview" className="h-16 w-16 sm:h-20 sm:w-20 rounded object-cover" />
+          <button onClick={() => setPreviewImage(null)} className="text-sm text-gray-600 hover:text-gray-900 px-3 py-1.5 rounded-full hover:bg-gray-100">Cancel</button>
         </div>
       )}
       
-      <form onSubmit={sendMessage} className="p-4 bg-white border-t flex gap-2 w-full items-center">
+      <form onSubmit={sendMessage} className="pb-safe p-2 sm:p-4 bg-white border-t flex gap-1 sm:gap-2 w-full items-center">
         <>
         <VoiceRecorder onSent={() => {}} onAudioPreview={(isPreview) => setIsPreviewMode(isPreview)} />
-        <button type="button" onClick={() => fileInputRef.current?.click()} className="p-3 hover:bg-gray-100 rounded-full flex-shrink-0 text-gray-500">
+        <button type="button" onClick={() => fileInputRef.current?.click()} className="p-3 hover:bg-gray-100 rounded-full shrink-0 text-gray-500" aria-label="Attach image">
             <ImageIcon size={20} />
         </button>
         <input type="file" ref={fileInputRef} onChange={handleImageUpload} accept="image/*" className="hidden" />
@@ -302,7 +309,7 @@ export default function ChatPage() {
               className="flex-1 p-3 px-4 bg-gray-100 border-none rounded-full outline-none focus:ring-2 focus:ring-blue-500 min-w-0"
               placeholder="Message..."
             />
-            <button type="submit" disabled={!newMessage.trim()} className="p-3 bg-blue-600 text-white rounded-full flex-shrink-0 disabled:opacity-50"><Send size={20} /></button>
+            <button type="submit" disabled={!newMessage.trim()} className="p-3 bg-blue-600 text-white rounded-full shrink-0 disabled:opacity-50" aria-label="Send message"><Send size={20} /></button>
           </>
         )}
         </>

@@ -16,24 +16,24 @@ export default function MobileBottomNav() {
   ];
 
   return (
-    <nav className="bg-white border-t border-gray-200 flex justify-around items-center h-16 px-2">
+    <nav className="bg-white border-t border-gray-200 flex justify-around items-stretch h-16 px-1">
       {navItems.map((item) => (
         <NavLink
           key={item.name}
           to={item.path}
           className={({ isActive }) =>
-            `relative flex flex-col items-center justify-center w-full h-full text-xs font-medium ${
+            `relative flex flex-1 flex-col items-center justify-center min-w-0 gap-0.5 text-[11px] font-medium ${
               isActive ? 'text-blue-600' : 'text-gray-500'
             }`
           }
         >
           {item.badge > 0 && (
-            <span className="absolute top-1 right-4 bg-red-500 text-white text-[10px] w-5 h-5 flex items-center justify-center rounded-full">
+            <span className="absolute top-1 right-1/2 translate-x-3 bg-red-500 text-white text-[10px] min-w-[18px] h-[18px] px-1 flex items-center justify-center rounded-full">
               {item.badge > 99 ? '99+' : item.badge}
             </span>
           )}
-          <item.icon className="w-6 h-6 mb-1" />
-          {item.name}
+          <item.icon className="w-6 h-6" />
+          <span className="truncate max-w-full">{item.name}</span>
         </NavLink>
       ))}
     </nav>

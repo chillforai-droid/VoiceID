@@ -6,8 +6,8 @@ export default function Careers() {
   return (
     <div className="min-h-screen flex flex-col">
       <Navbar />
-      <main className="flex-grow pt-32 pb-20 px-6 max-w-4xl mx-auto">
-        <h1 className="text-5xl font-extrabold tracking-tighter mb-8">Join the Future of Privacy</h1>
+      <main className="flex-grow pt-28 sm:pt-32 pb-16 sm:pb-20 px-4 sm:px-6 max-w-4xl mx-auto">
+        <h1 className="text-3xl sm:text-5xl font-extrabold tracking-tighter mb-8">Join the Future of Privacy</h1>
         <p className="text-xl text-gray-600 mb-8">At VoiceID, we are building a more private, secure internet. If you are passionate about privacy, cryptography, and building user-centric products, we want to hear from you.</p>
         
         <h2 className="text-3xl font-bold mb-4">Our Culture</h2>

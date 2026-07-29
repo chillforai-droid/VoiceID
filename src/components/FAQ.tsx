@@ -19,10 +19,10 @@ export default function FAQ() {
                     <div key={i} className="border-b border-gray-100">
                         <button 
                             onClick={() => setOpen(open === i ? null : i)}
-                            className="flex justify-between w-full py-4 text-left font-bold"
+                            className="flex justify-between items-center gap-4 w-full py-4 text-left font-bold"
                         >
-                            {faq.q}
-                            <ChevronDown className={`transition-transform ${open === i ? 'rotate-180' : ''}`} />
+                            <span>{faq.q}</span>
+                            <ChevronDown className={`shrink-0 transition-transform ${open === i ? 'rotate-180' : ''}`} />
                         </button>
                         <AnimatePresence>
                             {open === i && (

@@ -73,55 +73,55 @@ export default function SettingsPage() {
   };
 
   return (
-    <div className="max-w-xl mx-auto space-y-8 p-4">
+    <div className="max-w-xl mx-auto space-y-6 sm:space-y-8 p-4">
       <h1 className="text-2xl font-bold">Settings</h1>
       
       {/* Profile Section */}
-      <div className="space-y-4 p-6 bg-white border border-gray-100 rounded-2xl">
+      <div className="space-y-4 p-4 sm:p-6 bg-white border border-gray-100 rounded-2xl">
         <h2 className="text-lg font-semibold flex items-center gap-2"><User size={18}/> Profile</h2>
         <div className="flex items-center gap-4">
-            <Avatar url={profile?.avatar_url} displayName={profile?.display_name} className="w-16 h-16" />
-            <div className='flex-1'>
-                <p className="font-semibold">{profile?.display_name}</p>
-                <p className="text-gray-500">@{profile?.username}</p>
+            <Avatar url={profile?.avatar_url} displayName={profile?.display_name} className="w-16 h-16 shrink-0" />
+            <div className='flex-1 min-w-0'>
+                <p className="font-semibold truncate">{profile?.display_name}</p>
+                <p className="text-gray-500 truncate">@{profile?.username}</p>
             </div>
         </div>
         <input value={displayName} onChange={(e) => setDisplayName(e.target.value)} className="w-full p-3 border rounded-full" placeholder="Display Name" />
         <textarea value={bio} onChange={(e) => setBio(e.target.value)} className="w-full p-3 border rounded-2xl" placeholder="Bio" rows={3} />
-        <button onClick={saveProfile} disabled={loading} className="px-6 py-3 bg-blue-600 text-white rounded-full flex items-center gap-2">
+        <button onClick={saveProfile} disabled={loading} className="px-6 py-3 bg-blue-600 text-white rounded-full flex items-center gap-2 justify-center w-full sm:w-auto">
             {loading ? <Loader2 className="animate-spin" size={16}/> : <Save size={16}/>} Save Profile
         </button>
       </div>
 
       {/* Account & Security */}
-      <div className="p-6 bg-white border border-gray-100 rounded-2xl space-y-4">
+      <div className="p-4 sm:p-6 bg-white border border-gray-100 rounded-2xl space-y-4">
         <h2 className="text-lg font-semibold mb-4">Account</h2>
-        <p className="text-sm text-gray-500">Email: {user?.email}</p>
+        <p className="text-sm text-gray-500 break-words">Email: {user?.email}</p>
         <p className="text-sm text-gray-500">Provider: {user?.app_metadata.provider || 'Email & Password'}</p>
         {(!user?.app_metadata.provider || user?.app_metadata.provider === 'email') && (
             <div className="space-y-2">
                 <input type="password" placeholder="New Password" onChange={(e) => setPassword(e.target.value)} className="w-full p-3 border rounded-full" />
-                <button onClick={() => changePassword(password)} className="px-6 py-3 bg-gray-600 text-white rounded-full">Change Password</button>
+                <button onClick={() => changePassword(password)} className="px-6 py-3 bg-gray-600 text-white rounded-full w-full sm:w-auto">Change Password</button>
             </div>
         )}
       </div>
 
       {/* Blocked Users */}
-      {blockedUsers.length > 0 && <div className="p-6 bg-white border border-gray-100 rounded-2xl space-y-4">
+      {blockedUsers.length > 0 && <div className="p-4 sm:p-6 bg-white border border-gray-100 rounded-2xl space-y-4">
         <h2 className="text-lg font-semibold flex items-center gap-2"><Ban size={18}/> Blocked Users</h2>
         {blockedUsers.map(b => (
             <div key={b.responder_id} className="flex items-center justify-between gap-4">
-                <div className='flex items-center gap-2'>
-                    <Avatar url={b.profiles.avatar_url} displayName={b.profiles.display_name} className="w-8 h-8" />
-                    {b.profiles.display_name}
+                <div className='flex items-center gap-2 min-w-0'>
+                    <Avatar url={b.profiles.avatar_url} displayName={b.profiles.display_name} className="w-8 h-8 shrink-0" />
+                    <span className="truncate">{b.profiles.display_name}</span>
                 </div>
-                <button onClick={() => unblockUser(b.responder_id)} className="text-green-600 text-sm">Unblock</button>
+                <button onClick={() => unblockUser(b.responder_id)} className="text-green-600 text-sm shrink-0">Unblock</button>
             </div>
         ))}
       </div>}
 
       {/* Privacy */}
-      {settings && <div className="p-6 bg-white border border-gray-100 rounded-2xl space-y-4">
+      {settings && <div className="p-4 sm:p-6 bg-white border border-gray-100 rounded-2xl space-y-4">
         <h2 className="text-lg font-semibold flex items-center gap-2"><Shield size={18}/> Privacy</h2>
         <select value={settings.contact_requests} onChange={(e) => updateSettings({contact_requests: e.target.value})} className="w-full p-3 border rounded-full">
             <option value="everyone">Everyone can send contact requests</option>
@@ -131,7 +131,7 @@ export default function SettingsPage() {
       </div>}
 
       {/* Notifications */}
-      {settings && <div className="p-6 bg-white border border-gray-100 rounded-2xl space-y-4">
+      {settings && <div className="p-4 sm:p-6 bg-white border border-gray-100 rounded-2xl space-y-4">
         <h2 className="text-lg font-semibold flex items-center gap-2"><Bell size={18}/> Notifications</h2>
         <label className="flex items-center gap-2">
             <input type="checkbox" checked={settings.notify_contact_requests} onChange={(e) => updateSettings({notify_contact_requests: e.target.checked})} />
@@ -140,12 +140,12 @@ export default function SettingsPage() {
       </div>}
 
       {/* Danger Zone */}
-      <div className="p-6 bg-white border border-red-100 rounded-2xl space-y-4">
+      <div className="p-4 sm:p-6 bg-white border border-red-100 rounded-2xl space-y-4">
         <h2 className="text-lg font-semibold text-red-600 flex items-center gap-2"><Trash2 size={18}/> Danger Zone</h2>
         <button className="text-red-600 font-semibold flex items-center gap-2">Delete Account</button>
       </div>
 
-      <div className="p-6 bg-white border border-gray-100 rounded-2xl">
+      <div className="p-4 sm:p-6 bg-white border border-gray-100 rounded-2xl">
         <button onClick={signOut} className="text-red-600 font-semibold flex items-center gap-2"><LogOut size={16}/> Sign Out</button>
       </div>
       {message && <p className="text-sm text-green-600 text-center">{message}</p>}

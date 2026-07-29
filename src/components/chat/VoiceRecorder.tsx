@@ -194,8 +194,8 @@ export function VoiceRecorder({ onSent, onAudioPreview }: { onSent: () => void, 
   };
 
   return (
-    <div className="flex flex-col gap-2">
-      {error && <p className="text-red-500 text-sm">{error}</p>}
+    <div className="flex flex-col gap-2 min-w-0">
+      {error && <p className="text-red-500 text-xs sm:text-sm break-words max-w-[60vw] sm:max-w-xs">{error}</p>}
       <div className="flex items-center gap-2">
         {audioBlob ? (
           <>

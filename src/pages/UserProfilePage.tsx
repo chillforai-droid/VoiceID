@@ -177,43 +177,43 @@ export default function UserProfilePage() {
   if (!profile) return <div className="text-center py-20">Profile not found</div>;
 
   return (
-    <div className="max-w-xl mx-auto p-8 bg-white border border-gray-100 rounded-3xl shadow-sm">
+    <div className="max-w-xl mx-auto p-5 sm:p-8 bg-white border border-gray-100 rounded-3xl shadow-sm">
       <div className="text-center">
-        <div className="w-32 h-32 rounded-3xl bg-gray-100 mx-auto mb-6 overflow-hidden border-2 border-gray-200 relative">
+        <div className="w-24 h-24 sm:w-32 sm:h-32 rounded-3xl bg-gray-100 mx-auto mb-6 overflow-hidden border-2 border-gray-200 relative">
             {profile.avatar_url && <img src={profile.avatar_url} alt={profile.display_name} className="w-full h-full object-cover" />}
             {user?.id !== resolvedProfileId && (
                 <div className={`absolute bottom-2 right-2 w-4 h-4 rounded-full border-2 border-white ${isOnline ? 'bg-green-500' : 'bg-gray-400'}`} />
             )}
         </div>
-        <h1 className="text-4xl font-extrabold tracking-tight mb-1">{profile.display_name}</h1>
-        <p className="text-blue-600 font-medium text-lg mb-2">@{profile.username}</p>
+        <h1 className="text-2xl sm:text-4xl font-extrabold tracking-tight mb-1 break-words">{profile.display_name}</h1>
+        <p className="text-blue-600 font-medium text-base sm:text-lg mb-2 break-words">@{profile.username}</p>
         <p className="text-gray-500 text-sm mb-6">{isOnline ? '🟢 Online' : 'Offline'}</p>
-        <p className="text-gray-600 text-lg mb-10 leading-relaxed">{profile.bio || 'No bio yet.'}</p>
+        <p className="text-gray-600 text-base sm:text-lg mb-10 leading-relaxed break-words">{profile.bio || 'No bio yet.'}</p>
         
         {user?.id === resolvedProfileId && (
-            <div className="flex gap-4 justify-center mb-10">
-                <button onClick={() => navigate('/dashboard/profile/edit')} className="px-6 py-2 bg-blue-600 text-white rounded-full">Edit Profile</button>
-                <button onClick={handleShare} className="p-2 bg-gray-100 text-gray-600 rounded-full hover:bg-gray-200"><Share size={24} /></button>
+            <div className="flex flex-wrap gap-3 sm:gap-4 justify-center mb-10">
+                <button onClick={() => navigate('/dashboard/profile/edit')} className="px-6 py-2.5 bg-blue-600 text-white rounded-full">Edit Profile</button>
+                <button onClick={handleShare} className="p-2.5 bg-gray-100 text-gray-600 rounded-full hover:bg-gray-200" aria-label="Share profile"><Share size={22} /></button>
             </div>
         )}
         
         {user?.id !== resolvedProfileId && (
-            <div className="flex gap-4 justify-center">
-                <button onClick={handleCall} className={`p-5 rounded-full transition ${!isOnline || contactRelation.status !== 'accepted' ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-blue-50 text-blue-600 hover:bg-blue-100'}`}><Phone size={24} /></button>
-                <button onClick={handleMessageAction} className="p-5 bg-purple-50 text-purple-600 rounded-full hover:bg-purple-100 transition"><Mic size={24} /></button>
-                <button onClick={handleShare} className="p-5 bg-gray-100 text-gray-600 rounded-full hover:bg-gray-200 transition"><Share size={24} /></button>
-                {contactRelation.status === null && <button onClick={() => handleContactAction('add')} className="p-5 bg-gray-100 text-gray-600 rounded-full hover:bg-gray-200 transition"><UserPlus size={24} /></button>}
+            <div className="flex flex-wrap gap-3 sm:gap-4 justify-center">
+                <button onClick={handleCall} aria-label="Call" className={`p-3.5 sm:p-5 rounded-full transition ${!isOnline || contactRelation.status !== 'accepted' ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-blue-50 text-blue-600 hover:bg-blue-100'}`}><Phone size={22} /></button>
+                <button onClick={handleMessageAction} aria-label="Message" className="p-3.5 sm:p-5 bg-purple-50 text-purple-600 rounded-full hover:bg-purple-100 transition"><Mic size={22} /></button>
+                <button onClick={handleShare} aria-label="Share profile" className="p-3.5 sm:p-5 bg-gray-100 text-gray-600 rounded-full hover:bg-gray-200 transition"><Share size={22} /></button>
+                {contactRelation.status === null && <button onClick={() => handleContactAction('add')} aria-label="Add contact" className="p-3.5 sm:p-5 bg-gray-100 text-gray-600 rounded-full hover:bg-gray-200 transition"><UserPlus size={22} /></button>}
                 {contactRelation.status === 'pending' && contactRelation.isIncoming && (
                     <>
-                        <button onClick={() => handleContactAction('accept')} className="p-5 bg-green-50 text-green-600 rounded-full"><UserCheck size={24} /></button>
-                        <button onClick={() => handleContactAction('reject')} className="p-5 bg-red-50 text-red-600 rounded-full"><UserX size={24} /></button>
+                        <button onClick={() => handleContactAction('accept')} aria-label="Accept request" className="p-3.5 sm:p-5 bg-green-50 text-green-600 rounded-full"><UserCheck size={22} /></button>
+                        <button onClick={() => handleContactAction('reject')} aria-label="Reject request" className="p-3.5 sm:p-5 bg-red-50 text-red-600 rounded-full"><UserX size={22} /></button>
                     </>
                 )}
-                {contactRelation.status === 'pending' && !contactRelation.isIncoming && <button className="p-5 bg-yellow-50 text-yellow-600 rounded-full"><UserCheck size={24} /></button>}
-                {contactRelation.status === 'accepted' && <button onClick={() => handleContactAction('remove')} className="p-5 bg-red-50 text-red-600 rounded-full hover:bg-red-100 transition"><UserX size={24} /></button>}
+                {contactRelation.status === 'pending' && !contactRelation.isIncoming && <button aria-label="Request pending" className="p-3.5 sm:p-5 bg-yellow-50 text-yellow-600 rounded-full"><UserCheck size={22} /></button>}
+                {contactRelation.status === 'accepted' && <button onClick={() => handleContactAction('remove')} aria-label="Remove contact" className="p-3.5 sm:p-5 bg-red-50 text-red-600 rounded-full hover:bg-red-100 transition"><UserX size={22} /></button>}
                 {contactRelation.status !== 'blocked' ? 
-                    <button onClick={() => handleContactAction('block')} className="p-5 bg-red-50 text-red-600 rounded-full hover:bg-red-100 transition"><Ban size={24} /></button> :
-                    <button onClick={() => handleContactAction('unblock')} className="p-5 bg-green-50 text-green-600 rounded-full hover:bg-green-100 transition"><UserPlus size={24} /></button>
+                    <button onClick={() => handleContactAction('block')} aria-label="Block user" className="p-3.5 sm:p-5 bg-red-50 text-red-600 rounded-full hover:bg-red-100 transition"><Ban size={22} /></button> :
+                    <button onClick={() => handleContactAction('unblock')} aria-label="Unblock user" className="p-3.5 sm:p-5 bg-green-50 text-green-600 rounded-full hover:bg-green-100 transition"><UserPlus size={22} /></button>
                 }
             </div>
         )}
