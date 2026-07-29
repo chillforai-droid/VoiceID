@@ -1,75 +1,42 @@
-import React, { useState, useEffect } from 'react';
-import { MediaCache } from '../../lib/MediaCache';
-import { supabase } from '../../lib/supabase';
+import { useState, useEffect } from 'react';
+import { fetchAndCacheMedia } from '../../lib/mediaDownload';
 
 export function ImageMessage({ message }: { message: any }) {
     const [url, setUrl] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
+    const [failed, setFailed] = useState(false);
 
     useEffect(() => {
-        const loadMedia = async () => {
-            const cached = await MediaCache.getMedia(message.id);
-            if (cached) {
-                setUrl(URL.createObjectURL(cached.blob));
-                setLoading(false);
-                return;
-            }
+        let cancelled = false;
+        setLoading(true);
+        setFailed(false);
 
-            // Download
-            const session = await supabase.auth.getSession();
-            const token = session.data.session?.access_token;
-            
-            const res = await fetch("/api/media/download-auth", {
-                method: "POST",
-                headers: { 
-                    "Content-Type": "application/json",
-                    "Authorization": `Bearer ${token}` 
-                },
-                body: JSON.stringify({ messageId: message.id }),
+        fetchAndCacheMedia(message, 'image')
+            .then((blob) => {
+                if (cancelled) return;
+                setUrl(URL.createObjectURL(blob));
+            })
+            .catch((err) => {
+                console.error('ImageMessage: failed to load image', err);
+                if (!cancelled) setFailed(true);
+            })
+            .finally(() => {
+                if (!cancelled) setLoading(false);
             });
-            
-            if (!res.ok) {
-                console.error("ImageMessage: Auth fetch failed", res.status);
-                setLoading(false);
-                return;
-            }
-            
-            const { url: downloadUrl } = await res.json();
-            if (!downloadUrl) {
-                console.error("ImageMessage: Invalid download URL", downloadUrl);
-                setLoading(false);
-                return;
-            }
-            
-            const blobRes = await fetch(downloadUrl);
-            if (!blobRes.ok) {
-                console.error("ImageMessage: Blob fetch failed", blobRes.status);
-                setLoading(false);
-                return;
-            }
-            const blob = await blobRes.blob();
-            
-            // Verify hash and size
-            // ...
-            await MediaCache.putMedia({ ...message, blob });
-            
-            setUrl(URL.createObjectURL(blob));
-            setLoading(false);
-            
-            // ACK
-            await fetch("/api/media/ack", {
-                method: "POST",
-                headers: { 
-                    "Content-Type": "application/json",
-                    "Authorization": `Bearer ${token}` 
-                },
-                body: JSON.stringify({ messageId: message.id }),
-            });
-        };
-        loadMedia();
-    }, [message]);
+
+        return () => { cancelled = true; };
+    }, [message.id]);
 
     if (loading) return <div className="p-4 text-xs text-gray-400">Loading...</div>;
-    if (!url) return <div className="p-4 text-xs text-red-500">Failed to load image.</div>;
-    return <img src={url!} alt="message" className="max-w-xs rounded" />;
+    if (failed || !url) return <div className="p-4 text-xs text-red-500">Failed to load image.</div>;
+
+    // Responsive sizing: never exceeds the bubble, preserves aspect ratio,
+    // never stretches small images beyond their natural size, no cropping.
+    return (
+        <img
+            src={url}
+            alt="message"
+            className="block rounded max-w-full sm:max-w-[280px] max-h-[320px] w-auto h-auto object-contain"
+        />
+    );
 }

@@ -3,6 +3,7 @@ import { Mic, StopCircle, Send, X, Play } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useParams } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { MediaCache } from '../../lib/MediaCache';
 
 export function VoiceRecorder({ onSent, onAudioPreview }: { onSent: () => void, onAudioPreview?: (isPreview: boolean) => void }) {
   const { id } = useParams();
@@ -141,7 +142,18 @@ export function VoiceRecorder({ onSent, onAudioPreview }: { onSent: () => void, 
         setError('Failed to save message.'); 
         return; 
     }
-    
+
+    await MediaCache.putMedia({
+        messageId: messageId,
+        mediaType: 'voice',
+        blob: audioBlob,
+        mimeType: audioBlob.type,
+        byteSize: audioBlob.size,
+        createdAt: Date.now(),
+        sha256: sha256,
+        deliveryStatus: 'pending'
+    });
+
     setAudioBlob(null);
     onSent();
   };
