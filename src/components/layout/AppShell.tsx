@@ -1,5 +1,6 @@
 import React from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, Link } from 'react-router-dom';
+import { Settings } from 'lucide-react';
 import MobileBottomNav from './MobileBottomNav';
 import DesktopSidebar from './DesktopSidebar';
 import { CallManager } from '../chat/CallManager';
@@ -28,6 +29,13 @@ export default function AppShell({ children }: AppShellProps) {
         {!isChatRoute && (
           <header className="pt-safe h-16 border-b border-gray-200 bg-white flex items-center px-4 justify-between md:hidden shrink-0">
             <h1 className="font-semibold text-lg text-gray-900">VoiceID</h1>
+            <Link
+              to="/dashboard/settings"
+              aria-label="Settings"
+              className={`p-2 rounded-full hover:bg-gray-100 ${location.pathname === '/dashboard/settings' ? 'text-blue-600' : 'text-gray-600'}`}
+            >
+              <Settings size={22} />
+            </Link>
           </header>
         )}
         
@@ -44,4 +52,4 @@ export default function AppShell({ children }: AppShellProps) {
       )}
     </div>
   );
-}
+      }
