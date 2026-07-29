@@ -1,8 +1,8 @@
 import { VercelRequest, VercelResponse } from "@vercel/node";
 import crypto from "crypto";
 import { PutObjectCommand } from "@aws-sdk/client-s3";
-import { getS3Client } from "../lib/b2";
-import { verifyAuth } from "../lib/auth";
+import { getS3Client } from "../lib/b2.js";
+import { verifyAuth } from "../lib/auth.js";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
