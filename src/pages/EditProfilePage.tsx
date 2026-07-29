@@ -40,7 +40,6 @@ export default function EditProfilePage() {
         const folder = 'voiceid/avatars';
         const public_id = user?.id;
 
-        console.log("Requesting signature with:", { timestamp, folder, public_id });
         const response = await fetch('/api/cloudinary-sign', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -90,7 +89,6 @@ export default function EditProfilePage() {
             throw new Error('Not authenticated');
         }
         
-        console.log("AUTH UID:", authUser.id);
         
         // Query the profile BEFORE update to verify ID
         const { data: currentProfile, error: profileError } = await supabase
@@ -99,10 +97,8 @@ export default function EditProfilePage() {
             .eq("id", authUser.id)
             .single();
 
-        console.log("PROFILE BEFORE AVATAR UPDATE:", currentProfile);
         
         const avatarUrl = data.secure_url;
-        console.log("CLOUDINARY AVATAR URL:", avatarUrl);
 
         const { data: savedProfile, error: saveError } = await supabase
           .from('profiles')
@@ -113,7 +109,6 @@ export default function EditProfilePage() {
           .select("id, username, avatar_url")
           .single();
 
-        console.log("AVATAR DB UPDATE RESULT:", savedProfile);
 
         if (saveError) {
           console.error("AVATAR DB UPDATE ERROR:", saveError);
@@ -127,7 +122,6 @@ export default function EditProfilePage() {
           .eq("id", authUser.id)
           .single();
 
-        console.log("PERSISTED AVATAR:", verification);
 
         if (verification?.avatar_url !== avatarUrl) {
             console.error("Avatar URL persistence mismatch!");
@@ -136,7 +130,6 @@ export default function EditProfilePage() {
 
         await updateProfile();
         setMessage('Avatar updated!');
-        console.log("Avatar updated successfully. New URL:", avatarUrl);
     } catch (e) {
         console.error("Upload error:", e);
         setMessage('Failed to upload avatar.');

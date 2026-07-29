@@ -12,24 +12,10 @@ export function VoiceRecorder({ onSent, onAudioPreview }: { onSent: () => void, 
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [duration, setDuration] = useState(0);
-  const [debugLog, setDebugLog] = useState<string[]>([]);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const startTimeRef = useRef<number>(0);
-
-  // On-screen logger: mirrors console.log/error but also renders inline,
-  // since mobile browsers have no accessible devtools console.
-  const log = (label: string, data?: any) => {
-    const line = data !== undefined ? `${label} ${JSON.stringify(data)}` : label;
-    console.log(line);
-    setDebugLog(prev => [...prev, line].slice(-30));
-  };
-  const logErr = (label: string, err: any, extra?: any) => {
-    const line = `${label} name=${err?.name} message=${err?.message}${extra ? ' ' + JSON.stringify(extra) : ''}`;
-    console.error(line, err);
-    setDebugLog(prev => [...prev, line, `stack: ${err?.stack || 'n/a'}`].slice(-30));
-  };
 
   useEffect(() => {
     if (onAudioPreview) {
@@ -78,7 +64,6 @@ export function VoiceRecorder({ onSent, onAudioPreview }: { onSent: () => void, 
       startTimeRef.current = Date.now();
       setIsRecording(true);
     } catch (err: any) {
-      console.error('Recording error:', err);
       if (err.name === 'NotAllowedError') {
         setError("Microphone permission is blocked. Please allow microphone access in your browser.");
       } else if (window.self !== window.top) {
@@ -100,21 +85,15 @@ export function VoiceRecorder({ onSent, onAudioPreview }: { onSent: () => void, 
   };
 
   const sendAudio = async () => {
-    setDebugLog([]);
-    log("sendAudio() called", { hasAudioBlob: !!audioBlob, conversationId: id, userId: user?.id });
-
     if (!audioBlob) {
-      log("sendAudio: aborted - no audioBlob in state");
       setError('No recording to send.');
       return;
     }
     if (!id) {
-      log("sendAudio: aborted - no conversation id from route params");
       setError('Cannot send: conversation not loaded.');
       return;
     }
     if (!user) {
-      log("sendAudio: aborted - no authenticated user");
       setError('Cannot send: not signed in.');
       return;
     }
@@ -129,7 +108,6 @@ export function VoiceRecorder({ onSent, onAudioPreview }: { onSent: () => void, 
       const hashArray = Array.from(new Uint8Array(hashBuffer));
       sha256 = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
     } catch (err: any) {
-      logErr("sendAudio: [step 0 - hashing] threw", err);
       setError('Failed to process recording.');
       return;
     }
@@ -138,21 +116,12 @@ export function VoiceRecorder({ onSent, onAudioPreview }: { onSent: () => void, 
     const token = session.data.session?.access_token;
 
     // 2. Upload via the server-side proxy: /api/media/upload
-    // (Same endpoint used by image upload in ChatPage.tsx. The old flow used
-    // /api/media/upload-auth to get a presigned URL and then PUT the blob
-    // straight to B2 from the browser. That direct browser->B2 PUT is a
-    // cross-origin request with a custom Content-Type header, which forces
-    // a CORS preflight (OPTIONS). The B2 bucket's CORS rules allow GET
-    // (that's why downloads work) but were never configured to allow PUT,
-    // so the preflight is rejected and the browser blocks the request
-    // before any response is returned - surfacing as "TypeError: Failed to
-    // fetch" with no HTTP status. Routing through our own server, which
-    // already uploads to B2 with its authenticated S3 client, avoids the
-    // browser CORS requirement entirely, matching how images are uploaded.
+    // (Same endpoint used by image upload in ChatPage.tsx. The server holds
+    // the authenticated S3 client and uploads to B2 itself, so the browser
+    // never needs to talk to B2 directly.)
     const uploadUrl = "/api/media/upload";
     let objectKey: string;
     try {
-      log("sendAudio: [fetch 1] requesting", { url: uploadUrl, method: "POST" });
       const uploadRes = await fetch(uploadUrl, {
         method: "POST",
         headers: {
@@ -161,33 +130,27 @@ export function VoiceRecorder({ onSent, onAudioPreview }: { onSent: () => void, 
         },
         body: audioBlob,
       });
-      log("sendAudio: [fetch 1] response", { url: uploadUrl, status: uploadRes.status, ok: uploadRes.ok });
 
       if (!uploadRes.ok) {
-        log("sendAudio: [fetch 1] upload failed", { status: uploadRes.status, body: await uploadRes.text() });
         setError('Failed to upload audio.');
         return;
       }
 
       const json = await uploadRes.json();
       objectKey = json.objectKey;
-      log("sendAudio: [fetch 1] parsed body", { hasObjectKey: !!objectKey });
 
       if (!objectKey) {
-        log("sendAudio: [fetch 1] upload returned incomplete payload", json);
         setError('Failed to upload audio.');
         return;
       }
     } catch (err: any) {
-      logErr("sendAudio: [fetch 1] threw", err, { url: uploadUrl });
       setError(`Failed to send voice message: ${err?.message || 'Unknown error'}`);
       return;
     }
 
-    // 4. Insert metadata (Supabase client — not a raw fetch(), but the 3rd network call)
+    // 3. Insert metadata
     const messageId = crypto.randomUUID();
     try {
-      log("sendAudio: [supabase insert] requesting", { table: "messages", messageId });
       const { error: dbError } = await supabase.from('messages').insert({
           id: messageId,
           conversation_id: id,
@@ -201,15 +164,12 @@ export function VoiceRecorder({ onSent, onAudioPreview }: { onSent: () => void, 
           mime_type: audioBlob.type,
           byte_size: audioBlob.size
       });
-      log("sendAudio: [supabase insert] response", { hasError: !!dbError });
 
       if (dbError) {
-          log("VOICE MESSAGE INSERT ERROR", { error: dbError });
           setError('Failed to save message.');
           return;
       }
     } catch (err: any) {
-      logErr("sendAudio: [supabase insert] threw", err);
       setError(`Failed to send voice message: ${err?.message || 'Unknown error'}`);
       return;
     }
@@ -226,7 +186,6 @@ export function VoiceRecorder({ onSent, onAudioPreview }: { onSent: () => void, 
           deliveryStatus: 'pending'
       });
     } catch (err: any) {
-      logErr("sendAudio: [MediaCache.putMedia] threw", err);
       // Non-fatal: the message is already saved server-side, so don't block on local cache failure.
     }
 
@@ -244,10 +203,7 @@ export function VoiceRecorder({ onSent, onAudioPreview }: { onSent: () => void, 
             <button type="button" onClick={() => new Audio(URL.createObjectURL(audioBlob)).play()} className="p-3 bg-gray-100 text-gray-700 rounded-full"><Play size={20} /></button>
             <button
               type="button"
-              onClick={() => {
-                log("SEND BUTTON CLICKED");
-                sendAudio();
-              }}
+              onClick={() => sendAudio()}
               className="p-3 bg-blue-600 text-white rounded-full"
             >
               <Send size={20} />
@@ -259,23 +215,6 @@ export function VoiceRecorder({ onSent, onAudioPreview }: { onSent: () => void, 
           <button type="button" onClick={startRecording} className="p-3 bg-gray-100 text-gray-600 hover:bg-gray-200 rounded-full"><Mic size={20} /></button>
         )}
       </div>
-
-      {/* Temporary on-screen debug panel — mobile browsers have no devtools console. */}
-      {debugLog.length > 0 && (
-        <div className="mt-1 rounded-lg border border-gray-200 bg-gray-50 p-2 text-[10px] leading-snug text-gray-700 font-mono max-h-48 overflow-y-auto whitespace-pre-wrap break-all">
-          <div className="flex justify-between items-center mb-1">
-            <span className="font-semibold text-gray-500">Debug log</span>
-            <button
-              type="button"
-              onClick={() => navigator.clipboard?.writeText(debugLog.join('\n'))}
-              className="text-blue-600 font-semibold"
-            >
-              Copy
-            </button>
-          </div>
-          {debugLog.map((line, i) => <div key={i}>{line}</div>)}
-        </div>
-      )}
     </div>
   );
   }

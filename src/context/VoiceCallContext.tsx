@@ -161,19 +161,15 @@ export const VoiceCallProvider = ({ children }: { children: React.ReactNode }) =
         return;
     }
 
-    console.log('[CALL] caller:', user.id);
-    console.log('[CALL] receiver:', receiverId);
     
     const { data: call, error } = await supabase.from('calls').insert({ caller_id: user.id, receiver_id: receiverId, status: 'ringing' }).select().single();
     if (error) { console.error('[CALL] create failed:', error); return; }
-    console.log('[CALL] created:', call.id);
     
     setActiveCall(call);
     setCallState('ringing-outgoing');
 
     const timeout = setTimeout(async () => {
         if (callStateRef.current === 'ringing-outgoing') {
-             console.log('[CALL] timeout');
              await supabase.from('calls').update({ status: 'missed', ended_at: new Date().toISOString() }).eq('id', call.id);
              cleanupCall();
         }

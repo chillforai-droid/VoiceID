@@ -2,7 +2,6 @@ import { Request, Response } from 'express';
 import crypto from 'crypto';
 
 export default function handler(req: Request, res: Response) {
-  console.log("Cloudinary sign request body:", req.body);
   const { timestamp, folder, public_id } = req.body;
   const apiSecret = process.env.CLOUDINARY_API_SECRET;
   const apiKey = process.env.CLOUDINARY_API_KEY;

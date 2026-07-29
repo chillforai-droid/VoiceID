@@ -34,7 +34,6 @@ export default function ChatPage() {
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    console.log("handleImageUpload: file selected", file);
     if (!file || !user || !id) return;
     
     // Reset file input
@@ -43,7 +42,6 @@ export default function ChatPage() {
     // Set preview
     setPreviewImage(URL.createObjectURL(file));
     
-    console.log("handleImageUpload: starting upload");
     const arrayBuffer = await file.arrayBuffer();
     const hashBuffer = await crypto.subtle.digest('SHA-256', arrayBuffer);
     const hashArray = Array.from(new Uint8Array(hashBuffer));
@@ -52,7 +50,6 @@ export default function ChatPage() {
     const session = await supabase.auth.getSession();
     const token = session.data.session?.access_token;
     
-    console.log("handleImageUpload: calling proxy upload");
     const uploadRes = await fetch("/api/media/upload", {
       method: "POST",
       headers: { 
@@ -68,9 +65,7 @@ export default function ChatPage() {
     }
     
     const { objectKey } = await uploadRes.json();
-    console.log("handleImageUpload: upload response", { objectKey });
     
-    console.log("handleImageUpload: inserting metadata to Supabase");
     const { data: message, error: dbError } = await supabase.from('messages').insert({
         conversation_id: id,
         sender_id: user.id,
@@ -86,7 +81,6 @@ export default function ChatPage() {
     if (dbError) {
         console.error('Image message insert error:', dbError);
     } else {
-        console.log("handleImageUpload: inserted metadata to Supabase", message);
         // Cache the blob
         await MediaCache.putMedia({
             messageId: message.id,
@@ -147,7 +141,6 @@ export default function ChatPage() {
         setMessages(prev => prev.filter(m => m.id !== payload.old.id));
       })
       .subscribe((status) => {
-        console.log("Realtime subscription status:", status);
       });
 
     return () => { supabase.removeChannel(subscription); };
@@ -175,7 +168,6 @@ export default function ChatPage() {
   };
 
   const deleteMessage = async (m: any) => {
-    console.log("DEBUG_DELETE: messageId:", m.id, "messageConvId:", m.conversation_id, "urlConvId:", id);
     const session = await supabase.auth.getSession();
     const token = session.data.session?.access_token;
     
@@ -184,16 +176,12 @@ export default function ChatPage() {
         .delete()
         .eq('id', m.id);
     
-    console.log("DEBUG_DELETE: Supabase delete result:", { error, deleteData });
 
     if (error) { 
         console.error("Delete failed", error);
         alert('Failed to delete message: ' + error.message); 
         return; 
     }
-    
-    const { data: verifyData } = await supabase.from('messages').select('id').eq('id', m.id);
-    console.log("DEBUG_DELETE: Verification SELECT (should be empty array):", verifyData);
     
     if (m.b2_object_key) {
         await fetch(`/api/media/delete/${m.b2_object_key}`, {

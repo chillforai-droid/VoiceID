@@ -16,7 +16,6 @@ export default function NotificationsPage() {
 
   const fetchData = async () => {
     if (!user) return;
-    console.log("Fetching requests for user:", user?.id);
     const { data: reqData, error } = await supabase
         .from('contacts')
         .select('*, profiles:requester_id(*)')
@@ -24,7 +23,6 @@ export default function NotificationsPage() {
         .eq('status', 'pending');
     
     if (error) console.error("Error fetching requests:", error);
-    console.log("Fetched requests:", reqData);
     
     if (reqData) setRequests(reqData);
 

@@ -20,16 +20,13 @@ export default function ChooseVoiceID() {
   const createProfile = async () => {
     if (!user) { setSubmitError("User not authenticated"); return; }
     setSubmitError(null);
-    console.log("Starting profile creation", user.id, username);
     const { error } = await supabase.from('profiles').insert({
         id: user.id,
         username: username.toLowerCase()
     });
-    console.log("Supabase insert response error:", error);
     if (error) {
         setSubmitError(error.message);
     } else {
-        console.log("Profile created, navigating to dashboard");
         navigate('/dashboard');
     }
   };
