@@ -86,76 +86,106 @@ export function VoiceRecorder({ onSent, onAudioPreview }: { onSent: () => void, 
   };
 
   const sendAudio = async () => {
-    if (!audioBlob || !id || !user) return;
-    
-    // 1. Calculate Hash
-    const arrayBuffer = await audioBlob.arrayBuffer();
-    const hashBuffer = await crypto.subtle.digest('SHA-256', arrayBuffer);
-    const hashArray = Array.from(new Uint8Array(hashBuffer));
-    const sha256 = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+    console.log("sendAudio() called", { hasAudioBlob: !!audioBlob, conversationId: id, userId: user?.id });
 
-    // 2. Request Authorization
-    const session = await supabase.auth.getSession();
-    const token = session.data.session?.access_token;
-    
-    const authRes = await fetch("/api/media/upload-auth", {
-      method: "POST",
-      headers: { 
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${token}` 
-      },
-      body: JSON.stringify({ mimeType: audioBlob.type }),
-    });
-    
-    const { url, objectKey } = await authRes.json();
-    
-    // 3. Upload directly to B2
-    const uploadRes = await fetch(url, {
-        method: "PUT",
-        body: audioBlob,
-        headers: { "Content-Type": audioBlob.type }
-    });
-    
-    if (!uploadRes.ok) {
-        setError('Failed to upload audio.');
+    if (!audioBlob) {
+      console.warn("sendAudio: aborted - no audioBlob in state");
+      setError('No recording to send.');
+      return;
+    }
+    if (!id) {
+      console.warn("sendAudio: aborted - no conversation id from route params");
+      setError('Cannot send: conversation not loaded.');
+      return;
+    }
+    if (!user) {
+      console.warn("sendAudio: aborted - no authenticated user");
+      setError('Cannot send: not signed in.');
+      return;
+    }
+
+    setError(null);
+
+    try {
+      // 1. Calculate Hash
+      const arrayBuffer = await audioBlob.arrayBuffer();
+      const hashBuffer = await crypto.subtle.digest('SHA-256', arrayBuffer);
+      const hashArray = Array.from(new Uint8Array(hashBuffer));
+      const sha256 = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+
+      // 2. Request Authorization
+      const session = await supabase.auth.getSession();
+      const token = session.data.session?.access_token;
+
+      const authRes = await fetch("/api/media/upload-auth", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
+        body: JSON.stringify({ mimeType: audioBlob.type }),
+      });
+
+      if (!authRes.ok) {
+        console.error("sendAudio: upload-auth failed", authRes.status, await authRes.text());
+        setError('Failed to authorize upload.');
         return;
-    }
-    
-    // 4. Insert metadata
-    const messageId = crypto.randomUUID();
-    const { error: dbError } = await supabase.from('messages').insert({
-        id: messageId,
-        conversation_id: id,
-        sender_id: user.id,
-        content_body: '',
-        content_type: 'voice',
-        b2_object_key: objectKey,
-        sha256: sha256,
-        media_status: 'pending',
-        duration: duration,
-        mime_type: audioBlob.type,
-        byte_size: audioBlob.size
-    });
-    
-    if (dbError) {
-        console.error("VOICE MESSAGE INSERT ERROR", { error: dbError });
-        setError('Failed to save message.'); 
-        return; 
-    }
+      }
 
-    await MediaCache.putMedia({
-        messageId: messageId,
-        mediaType: 'voice',
-        blob: audioBlob,
-        mimeType: audioBlob.type,
-        byteSize: audioBlob.size,
-        createdAt: Date.now(),
-        sha256: sha256,
-        deliveryStatus: 'pending'
-    });
+      const { url, objectKey } = await authRes.json();
 
-    setAudioBlob(null);
-    onSent();
+      // 3. Upload directly to B2
+      const uploadRes = await fetch(url, {
+          method: "PUT",
+          body: audioBlob,
+          headers: { "Content-Type": audioBlob.type }
+      });
+
+      if (!uploadRes.ok) {
+          console.error("sendAudio: B2 upload failed", uploadRes.status);
+          setError('Failed to upload audio.');
+          return;
+      }
+
+      // 4. Insert metadata
+      const messageId = crypto.randomUUID();
+      const { error: dbError } = await supabase.from('messages').insert({
+          id: messageId,
+          conversation_id: id,
+          sender_id: user.id,
+          content_body: '',
+          content_type: 'voice',
+          b2_object_key: objectKey,
+          sha256: sha256,
+          media_status: 'pending',
+          duration: duration,
+          mime_type: audioBlob.type,
+          byte_size: audioBlob.size
+      });
+
+      if (dbError) {
+          console.error("VOICE MESSAGE INSERT ERROR", { error: dbError });
+          setError('Failed to save message.');
+          return;
+      }
+
+      await MediaCache.putMedia({
+          messageId: messageId,
+          mediaType: 'voice',
+          blob: audioBlob,
+          mimeType: audioBlob.type,
+          byteSize: audioBlob.size,
+          createdAt: Date.now(),
+          sha256: sha256,
+          deliveryStatus: 'pending'
+      });
+
+      setAudioBlob(null);
+      onSent();
+    } catch (err: any) {
+      console.error("sendAudio: unexpected error", err);
+      setError(`Failed to send voice message: ${err?.message || 'Unknown error'}`);
+    }
   };
 
   return (
@@ -164,14 +194,23 @@ export function VoiceRecorder({ onSent, onAudioPreview }: { onSent: () => void, 
       <div className="flex items-center gap-2">
         {audioBlob ? (
           <>
-            <button onClick={() => setAudioBlob(null)} className="p-3 text-gray-500 hover:bg-gray-100 rounded-full"><X size={20} /></button>
-            <button onClick={() => new Audio(URL.createObjectURL(audioBlob)).play()} className="p-3 bg-gray-100 text-gray-700 rounded-full"><Play size={20} /></button>
-            <button onClick={sendAudio} className="p-3 bg-blue-600 text-white rounded-full"><Send size={20} /></button>
+            <button type="button" onClick={() => setAudioBlob(null)} className="p-3 text-gray-500 hover:bg-gray-100 rounded-full"><X size={20} /></button>
+            <button type="button" onClick={() => new Audio(URL.createObjectURL(audioBlob)).play()} className="p-3 bg-gray-100 text-gray-700 rounded-full"><Play size={20} /></button>
+            <button
+              type="button"
+              onClick={() => {
+                console.log("SEND BUTTON CLICKED");
+                sendAudio();
+              }}
+              className="p-3 bg-blue-600 text-white rounded-full"
+            >
+              <Send size={20} />
+            </button>
           </>
         ) : isRecording ? (
-          <button onClick={stopRecording} className="p-3 bg-red-500 text-white rounded-full animate-pulse"><StopCircle size={20} /></button>
+          <button type="button" onClick={stopRecording} className="p-3 bg-red-500 text-white rounded-full animate-pulse"><StopCircle size={20} /></button>
         ) : (
-          <button onClick={startRecording} className="p-3 bg-gray-100 text-gray-600 hover:bg-gray-200 rounded-full"><Mic size={20} /></button>
+          <button type="button" onClick={startRecording} className="p-3 bg-gray-100 text-gray-600 hover:bg-gray-200 rounded-full"><Mic size={20} /></button>
         )}
       </div>
     </div>
