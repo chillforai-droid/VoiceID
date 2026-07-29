@@ -12,10 +12,24 @@ export function VoiceRecorder({ onSent, onAudioPreview }: { onSent: () => void, 
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [duration, setDuration] = useState(0);
+  const [debugLog, setDebugLog] = useState<string[]>([]);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const startTimeRef = useRef<number>(0);
+
+  // On-screen logger: mirrors console.log/error but also renders inline,
+  // since mobile browsers have no accessible devtools console.
+  const log = (label: string, data?: any) => {
+    const line = data !== undefined ? `${label} ${JSON.stringify(data)}` : label;
+    console.log(line);
+    setDebugLog(prev => [...prev, line].slice(-30));
+  };
+  const logErr = (label: string, err: any, extra?: any) => {
+    const line = `${label} name=${err?.name} message=${err?.message}${extra ? ' ' + JSON.stringify(extra) : ''}`;
+    console.error(line, err);
+    setDebugLog(prev => [...prev, line, `stack: ${err?.stack || 'n/a'}`].slice(-30));
+  };
 
   useEffect(() => {
     if (onAudioPreview) {
@@ -86,20 +100,21 @@ export function VoiceRecorder({ onSent, onAudioPreview }: { onSent: () => void, 
   };
 
   const sendAudio = async () => {
-    console.log("sendAudio() called", { hasAudioBlob: !!audioBlob, conversationId: id, userId: user?.id });
+    setDebugLog([]);
+    log("sendAudio() called", { hasAudioBlob: !!audioBlob, conversationId: id, userId: user?.id });
 
     if (!audioBlob) {
-      console.warn("sendAudio: aborted - no audioBlob in state");
+      log("sendAudio: aborted - no audioBlob in state");
       setError('No recording to send.');
       return;
     }
     if (!id) {
-      console.warn("sendAudio: aborted - no conversation id from route params");
+      log("sendAudio: aborted - no conversation id from route params");
       setError('Cannot send: conversation not loaded.');
       return;
     }
     if (!user) {
-      console.warn("sendAudio: aborted - no authenticated user");
+      log("sendAudio: aborted - no authenticated user");
       setError('Cannot send: not signed in.');
       return;
     }
@@ -114,7 +129,7 @@ export function VoiceRecorder({ onSent, onAudioPreview }: { onSent: () => void, 
       const hashArray = Array.from(new Uint8Array(hashBuffer));
       sha256 = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
     } catch (err: any) {
-      console.error("sendAudio: [step 0 - hashing] threw", { error: err, stack: err?.stack });
+      logErr("sendAudio: [step 0 - hashing] threw", err);
       setError('Failed to process recording.');
       return;
     }
@@ -126,7 +141,7 @@ export function VoiceRecorder({ onSent, onAudioPreview }: { onSent: () => void, 
     const uploadAuthUrl = "/api/media/upload-auth";
     let url: string, objectKey: string;
     try {
-      console.log("sendAudio: [fetch 1] requesting", { url: uploadAuthUrl, method: "POST" });
+      log("sendAudio: [fetch 1] requesting", { url: uploadAuthUrl, method: "POST" });
       const authRes = await fetch(uploadAuthUrl, {
         method: "POST",
         headers: {
@@ -135,10 +150,10 @@ export function VoiceRecorder({ onSent, onAudioPreview }: { onSent: () => void, 
         },
         body: JSON.stringify({ mimeType: audioBlob.type }),
       });
-      console.log("sendAudio: [fetch 1] response", { url: uploadAuthUrl, status: authRes.status, ok: authRes.ok });
+      log("sendAudio: [fetch 1] response", { url: uploadAuthUrl, status: authRes.status, ok: authRes.ok });
 
       if (!authRes.ok) {
-        console.error("sendAudio: [fetch 1] upload-auth failed", authRes.status, await authRes.text());
+        log("sendAudio: [fetch 1] upload-auth failed", { status: authRes.status, body: await authRes.text() });
         setError('Failed to authorize upload.');
         return;
       }
@@ -146,36 +161,36 @@ export function VoiceRecorder({ onSent, onAudioPreview }: { onSent: () => void, 
       const json = await authRes.json();
       url = json.url;
       objectKey = json.objectKey;
-      console.log("sendAudio: [fetch 1] parsed body", { hasUrl: !!url, hasObjectKey: !!objectKey });
+      log("sendAudio: [fetch 1] parsed body", { hasUrl: !!url, hasObjectKey: !!objectKey });
 
       if (!url || !objectKey) {
-        console.error("sendAudio: [fetch 1] upload-auth returned incomplete payload", json);
+        log("sendAudio: [fetch 1] upload-auth returned incomplete payload", json);
         setError('Failed to authorize upload.');
         return;
       }
     } catch (err: any) {
-      console.error("sendAudio: [fetch 1] threw", { url: uploadAuthUrl, error: err, name: err?.name, message: err?.message, stack: err?.stack });
+      logErr("sendAudio: [fetch 1] threw", err, { url: uploadAuthUrl });
       setError(`Failed to send voice message: ${err?.message || 'Unknown error'}`);
       return;
     }
 
     // 3. Upload directly to B2 (presigned PUT)
     try {
-      console.log("sendAudio: [fetch 2] requesting", { url, method: "PUT" });
+      log("sendAudio: [fetch 2] requesting", { url, method: "PUT" });
       const uploadRes = await fetch(url, {
           method: "PUT",
           body: audioBlob,
           headers: { "Content-Type": audioBlob.type }
       });
-      console.log("sendAudio: [fetch 2] response", { url, status: uploadRes.status, ok: uploadRes.ok });
+      log("sendAudio: [fetch 2] response", { url, status: uploadRes.status, ok: uploadRes.ok });
 
       if (!uploadRes.ok) {
-          console.error("sendAudio: [fetch 2] B2 upload failed", uploadRes.status);
+          log("sendAudio: [fetch 2] B2 upload failed", { status: uploadRes.status });
           setError('Failed to upload audio.');
           return;
       }
     } catch (err: any) {
-      console.error("sendAudio: [fetch 2] threw", { url, error: err, name: err?.name, message: err?.message, stack: err?.stack });
+      logErr("sendAudio: [fetch 2] threw", err, { url });
       setError(`Failed to send voice message: ${err?.message || 'Unknown error'}`);
       return;
     }
@@ -183,7 +198,7 @@ export function VoiceRecorder({ onSent, onAudioPreview }: { onSent: () => void, 
     // 4. Insert metadata (Supabase client — not a raw fetch(), but the 3rd network call)
     const messageId = crypto.randomUUID();
     try {
-      console.log("sendAudio: [supabase insert] requesting", { table: "messages", messageId });
+      log("sendAudio: [supabase insert] requesting", { table: "messages", messageId });
       const { error: dbError } = await supabase.from('messages').insert({
           id: messageId,
           conversation_id: id,
@@ -197,15 +212,15 @@ export function VoiceRecorder({ onSent, onAudioPreview }: { onSent: () => void, 
           mime_type: audioBlob.type,
           byte_size: audioBlob.size
       });
-      console.log("sendAudio: [supabase insert] response", { hasError: !!dbError });
+      log("sendAudio: [supabase insert] response", { hasError: !!dbError });
 
       if (dbError) {
-          console.error("VOICE MESSAGE INSERT ERROR", { error: dbError });
+          log("VOICE MESSAGE INSERT ERROR", { error: dbError });
           setError('Failed to save message.');
           return;
       }
     } catch (err: any) {
-      console.error("sendAudio: [supabase insert] threw", { error: err, name: err?.name, message: err?.message, stack: err?.stack });
+      logErr("sendAudio: [supabase insert] threw", err);
       setError(`Failed to send voice message: ${err?.message || 'Unknown error'}`);
       return;
     }
@@ -222,7 +237,7 @@ export function VoiceRecorder({ onSent, onAudioPreview }: { onSent: () => void, 
           deliveryStatus: 'pending'
       });
     } catch (err: any) {
-      console.error("sendAudio: [MediaCache.putMedia] threw", { error: err, stack: err?.stack });
+      logErr("sendAudio: [MediaCache.putMedia] threw", err);
       // Non-fatal: the message is already saved server-side, so don't block on local cache failure.
     }
 
@@ -241,7 +256,7 @@ export function VoiceRecorder({ onSent, onAudioPreview }: { onSent: () => void, 
             <button
               type="button"
               onClick={() => {
-                console.log("SEND BUTTON CLICKED");
+                log("SEND BUTTON CLICKED");
                 sendAudio();
               }}
               className="p-3 bg-blue-600 text-white rounded-full"
@@ -255,6 +270,23 @@ export function VoiceRecorder({ onSent, onAudioPreview }: { onSent: () => void, 
           <button type="button" onClick={startRecording} className="p-3 bg-gray-100 text-gray-600 hover:bg-gray-200 rounded-full"><Mic size={20} /></button>
         )}
       </div>
+
+      {/* Temporary on-screen debug panel — mobile browsers have no devtools console. */}
+      {debugLog.length > 0 && (
+        <div className="mt-1 rounded-lg border border-gray-200 bg-gray-50 p-2 text-[10px] leading-snug text-gray-700 font-mono max-h-48 overflow-y-auto whitespace-pre-wrap break-all">
+          <div className="flex justify-between items-center mb-1">
+            <span className="font-semibold text-gray-500">Debug log</span>
+            <button
+              type="button"
+              onClick={() => navigator.clipboard?.writeText(debugLog.join('\n'))}
+              className="text-blue-600 font-semibold"
+            >
+              Copy
+            </button>
+          </div>
+          {debugLog.map((line, i) => <div key={i}>{line}</div>)}
+        </div>
+      )}
     </div>
   );
-        }
+  }
