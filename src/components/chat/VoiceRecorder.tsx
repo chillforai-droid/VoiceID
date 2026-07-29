@@ -137,60 +137,49 @@ export function VoiceRecorder({ onSent, onAudioPreview }: { onSent: () => void, 
     const session = await supabase.auth.getSession();
     const token = session.data.session?.access_token;
 
-    // 2. Request Authorization: /api/media/upload-auth
-    const uploadAuthUrl = "/api/media/upload-auth";
-    let url: string, objectKey: string;
+    // 2. Upload via the server-side proxy: /api/media/upload
+    // (Same endpoint used by image upload in ChatPage.tsx. The old flow used
+    // /api/media/upload-auth to get a presigned URL and then PUT the blob
+    // straight to B2 from the browser. That direct browser->B2 PUT is a
+    // cross-origin request with a custom Content-Type header, which forces
+    // a CORS preflight (OPTIONS). The B2 bucket's CORS rules allow GET
+    // (that's why downloads work) but were never configured to allow PUT,
+    // so the preflight is rejected and the browser blocks the request
+    // before any response is returned - surfacing as "TypeError: Failed to
+    // fetch" with no HTTP status. Routing through our own server, which
+    // already uploads to B2 with its authenticated S3 client, avoids the
+    // browser CORS requirement entirely, matching how images are uploaded.
+    const uploadUrl = "/api/media/upload";
+    let objectKey: string;
     try {
-      log("sendAudio: [fetch 1] requesting", { url: uploadAuthUrl, method: "POST" });
-      const authRes = await fetch(uploadAuthUrl, {
+      log("sendAudio: [fetch 1] requesting", { url: uploadUrl, method: "POST" });
+      const uploadRes = await fetch(uploadUrl, {
         method: "POST",
         headers: {
-          "Content-Type": "application/json",
+          "Content-Type": audioBlob.type,
           "Authorization": `Bearer ${token}`
         },
-        body: JSON.stringify({ mimeType: audioBlob.type }),
+        body: audioBlob,
       });
-      log("sendAudio: [fetch 1] response", { url: uploadAuthUrl, status: authRes.status, ok: authRes.ok });
-
-      if (!authRes.ok) {
-        log("sendAudio: [fetch 1] upload-auth failed", { status: authRes.status, body: await authRes.text() });
-        setError('Failed to authorize upload.');
-        return;
-      }
-
-      const json = await authRes.json();
-      url = json.url;
-      objectKey = json.objectKey;
-      log("sendAudio: [fetch 1] parsed body", { hasUrl: !!url, hasObjectKey: !!objectKey });
-
-      if (!url || !objectKey) {
-        log("sendAudio: [fetch 1] upload-auth returned incomplete payload", json);
-        setError('Failed to authorize upload.');
-        return;
-      }
-    } catch (err: any) {
-      logErr("sendAudio: [fetch 1] threw", err, { url: uploadAuthUrl });
-      setError(`Failed to send voice message: ${err?.message || 'Unknown error'}`);
-      return;
-    }
-
-    // 3. Upload directly to B2 (presigned PUT)
-    try {
-      log("sendAudio: [fetch 2] requesting", { url, method: "PUT" });
-      const uploadRes = await fetch(url, {
-          method: "PUT",
-          body: audioBlob,
-          headers: { "Content-Type": audioBlob.type }
-      });
-      log("sendAudio: [fetch 2] response", { url, status: uploadRes.status, ok: uploadRes.ok });
+      log("sendAudio: [fetch 1] response", { url: uploadUrl, status: uploadRes.status, ok: uploadRes.ok });
 
       if (!uploadRes.ok) {
-          log("sendAudio: [fetch 2] B2 upload failed", { status: uploadRes.status });
-          setError('Failed to upload audio.');
-          return;
+        log("sendAudio: [fetch 1] upload failed", { status: uploadRes.status, body: await uploadRes.text() });
+        setError('Failed to upload audio.');
+        return;
+      }
+
+      const json = await uploadRes.json();
+      objectKey = json.objectKey;
+      log("sendAudio: [fetch 1] parsed body", { hasObjectKey: !!objectKey });
+
+      if (!objectKey) {
+        log("sendAudio: [fetch 1] upload returned incomplete payload", json);
+        setError('Failed to upload audio.');
+        return;
       }
     } catch (err: any) {
-      logErr("sendAudio: [fetch 2] threw", err, { url });
+      logErr("sendAudio: [fetch 1] threw", err, { url: uploadUrl });
       setError(`Failed to send voice message: ${err?.message || 'Unknown error'}`);
       return;
     }
