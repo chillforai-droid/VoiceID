@@ -1,6 +1,26 @@
 {
   "rewrites": [
     {
+      "source": "/api/media/upload",
+      "destination": "/api/upload"
+    },
+    {
+      "source": "/api/media/upload-auth",
+      "destination": "/api/upload-auth"
+    },
+    {
+      "source": "/api/media/download-auth",
+      "destination": "/api/download-auth"
+    },
+    {
+      "source": "/api/media/ack",
+      "destination": "/api/ack"
+    },
+    {
+      "source": "/api/media/delete/:objectKey",
+      "destination": "/api/delete/:objectKey"
+    },
+    {
       "source": "/((?!api/).*)",
       "destination": "/index.html"
     }
