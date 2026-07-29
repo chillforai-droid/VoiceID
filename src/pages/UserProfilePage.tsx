@@ -108,12 +108,17 @@ export default function UserProfilePage() {
     if (!user || user.id === resolvedProfileId) return;
     
     let error;
+    let rowsAffected: any[] | null = null;
     if (action === 'add') {
         const { error: err } = await supabase.from('contacts').insert({ requester_id: user?.id, responder_id: resolvedProfileId, status: 'pending' });
         error = err;
     } else if (action === 'remove' || action === 'reject') {
-        const { error: err } = await supabase.from('contacts').delete().or(`and(requester_id.eq.${user?.id},responder_id.eq.${resolvedProfileId}),and(requester_id.eq.${resolvedProfileId},responder_id.eq.${user?.id})`);
+        // .select() forces the delete to report back which rows it actually
+        // removed. Without it, a delete blocked by RLS (0 rows affected)
+        // still returns error: null, making a no-op look successful.
+        const { data, error: err } = await supabase.from('contacts').delete().or(`and(requester_id.eq.${user?.id},responder_id.eq.${resolvedProfileId}),and(requester_id.eq.${resolvedProfileId},responder_id.eq.${user?.id})`).select();
         error = err;
+        rowsAffected = data;
     } else if (action === 'accept') {
         const { error: err } = await supabase.from('contacts').update({ status: 'accepted' }).or(`and(requester_id.eq.${user?.id},responder_id.eq.${resolvedProfileId}),and(requester_id.eq.${resolvedProfileId},responder_id.eq.${user?.id})`);
         error = err;
@@ -121,8 +126,15 @@ export default function UserProfilePage() {
         const { error: err } = await supabase.from('contacts').upsert({ requester_id: user?.id, responder_id: resolvedProfileId, status: 'blocked' }).or(`and(requester_id.eq.${user?.id},responder_id.eq.${resolvedProfileId}),and(requester_id.eq.${resolvedProfileId},responder_id.eq.${user?.id})`);
         error = err;
     } else if (action === 'unblock') {
-        const { error: err } = await supabase.from('contacts').delete().or(`and(requester_id.eq.${user?.id},responder_id.eq.${resolvedProfileId}),and(requester_id.eq.${resolvedProfileId},responder_id.eq.${user?.id})`);
+        const { data, error: err } = await supabase.from('contacts').delete().or(`and(requester_id.eq.${user?.id},responder_id.eq.${resolvedProfileId}),and(requester_id.eq.${resolvedProfileId},responder_id.eq.${user?.id})`).select();
         error = err;
+        rowsAffected = data;
+    }
+
+    if ((action === 'remove' || action === 'reject' || action === 'unblock') && !error && (!rowsAffected || rowsAffected.length === 0)) {
+        console.error(`Contact ${action} affected 0 rows (blocked by RLS or already removed)`, resolvedProfileId);
+        alert(`Failed to ${action === 'unblock' ? 'unblock user' : action === 'reject' ? 'reject request' : 'remove contact'}: permission denied.`);
+        return;
     }
 
     if (!error) {

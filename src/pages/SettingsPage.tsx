@@ -55,7 +55,21 @@ export default function SettingsPage() {
   };
 
   const unblockUser = async (blockedUserId: string) => {
-    await supabase.from('contacts').delete().match({ requester_id: user?.id, responder_id: blockedUserId, status: 'blocked' });
+    // .select() forces the delete to report back which rows it actually
+    // removed. Without it, a delete blocked by RLS (0 rows affected) still
+    // returns error: null, so a no-op would look identical to success.
+    const { data, error } = await supabase.from('contacts').delete().match({ requester_id: user?.id, responder_id: blockedUserId, status: 'blocked' }).select();
+
+    if (error) {
+        console.error('Unblock failed', error);
+        setMessage(`Error: ${error.message}`);
+        return;
+    }
+    if (!data || data.length === 0) {
+        console.error('Unblock affected 0 rows (blocked by RLS or already unblocked)', blockedUserId);
+        setMessage('Failed to unblock user: permission denied.');
+        return;
+    }
     fetchBlockedUsers();
   };
 

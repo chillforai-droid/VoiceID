@@ -171,16 +171,26 @@ export default function ChatPage() {
     const session = await supabase.auth.getSession();
     const token = session.data.session?.access_token;
     
+    // .select() forces PostgREST to return the row(s) actually deleted.
+    // Without it, a DELETE blocked by RLS (0 rows affected) still comes
+    // back with error: null, which would make this look successful even
+    // though nothing changed in the database.
     const { data: deleteData, error } = await supabase
         .from('messages')
         .delete()
-        .eq('id', m.id);
-    
+        .eq('id', m.id)
+        .select();
 
     if (error) { 
         console.error("Delete failed", error);
         alert('Failed to delete message: ' + error.message); 
         return; 
+    }
+
+    if (!deleteData || deleteData.length === 0) {
+        console.error("Delete affected 0 rows (blocked by RLS or already deleted)", m.id);
+        alert('Failed to delete message: you may not have permission to delete this message.');
+        return;
     }
     
     if (m.b2_object_key) {
@@ -195,9 +205,11 @@ export default function ChatPage() {
 
   const updateMessage = async () => {
     if (!editingMessage || !editContent.trim()) return;
-    const { error } = await supabase.from('messages').update({ content_body: editContent + " (edited)" }).eq('id', editingMessage.id);
+    const { data, error } = await supabase.from('messages').update({ content_body: editContent + " (edited)" }).eq('id', editingMessage.id).select();
     if (error) {
         alert('Failed to update message: ' + error.message);
+    } else if (!data || data.length === 0) {
+        alert('Failed to update message: you may not have permission to edit this message.');
     } else {
         setMessages(prev =>
             prev.map(msg =>
