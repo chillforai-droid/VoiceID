@@ -106,18 +106,28 @@ export function VoiceRecorder({ onSent, onAudioPreview }: { onSent: () => void, 
 
     setError(null);
 
+    // 1. Calculate Hash
+    let sha256: string;
     try {
-      // 1. Calculate Hash
       const arrayBuffer = await audioBlob.arrayBuffer();
       const hashBuffer = await crypto.subtle.digest('SHA-256', arrayBuffer);
       const hashArray = Array.from(new Uint8Array(hashBuffer));
-      const sha256 = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+      sha256 = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+    } catch (err: any) {
+      console.error("sendAudio: [step 0 - hashing] threw", { error: err, stack: err?.stack });
+      setError('Failed to process recording.');
+      return;
+    }
 
-      // 2. Request Authorization
-      const session = await supabase.auth.getSession();
-      const token = session.data.session?.access_token;
+    const session = await supabase.auth.getSession();
+    const token = session.data.session?.access_token;
 
-      const authRes = await fetch("/api/media/upload-auth", {
+    // 2. Request Authorization: /api/media/upload-auth
+    const uploadAuthUrl = "/api/media/upload-auth";
+    let url: string, objectKey: string;
+    try {
+      console.log("sendAudio: [fetch 1] requesting", { url: uploadAuthUrl, method: "POST" });
+      const authRes = await fetch(uploadAuthUrl, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -125,30 +135,55 @@ export function VoiceRecorder({ onSent, onAudioPreview }: { onSent: () => void, 
         },
         body: JSON.stringify({ mimeType: audioBlob.type }),
       });
+      console.log("sendAudio: [fetch 1] response", { url: uploadAuthUrl, status: authRes.status, ok: authRes.ok });
 
       if (!authRes.ok) {
-        console.error("sendAudio: upload-auth failed", authRes.status, await authRes.text());
+        console.error("sendAudio: [fetch 1] upload-auth failed", authRes.status, await authRes.text());
         setError('Failed to authorize upload.');
         return;
       }
 
-      const { url, objectKey } = await authRes.json();
+      const json = await authRes.json();
+      url = json.url;
+      objectKey = json.objectKey;
+      console.log("sendAudio: [fetch 1] parsed body", { hasUrl: !!url, hasObjectKey: !!objectKey });
 
-      // 3. Upload directly to B2
+      if (!url || !objectKey) {
+        console.error("sendAudio: [fetch 1] upload-auth returned incomplete payload", json);
+        setError('Failed to authorize upload.');
+        return;
+      }
+    } catch (err: any) {
+      console.error("sendAudio: [fetch 1] threw", { url: uploadAuthUrl, error: err, name: err?.name, message: err?.message, stack: err?.stack });
+      setError(`Failed to send voice message: ${err?.message || 'Unknown error'}`);
+      return;
+    }
+
+    // 3. Upload directly to B2 (presigned PUT)
+    try {
+      console.log("sendAudio: [fetch 2] requesting", { url, method: "PUT" });
       const uploadRes = await fetch(url, {
           method: "PUT",
           body: audioBlob,
           headers: { "Content-Type": audioBlob.type }
       });
+      console.log("sendAudio: [fetch 2] response", { url, status: uploadRes.status, ok: uploadRes.ok });
 
       if (!uploadRes.ok) {
-          console.error("sendAudio: B2 upload failed", uploadRes.status);
+          console.error("sendAudio: [fetch 2] B2 upload failed", uploadRes.status);
           setError('Failed to upload audio.');
           return;
       }
+    } catch (err: any) {
+      console.error("sendAudio: [fetch 2] threw", { url, error: err, name: err?.name, message: err?.message, stack: err?.stack });
+      setError(`Failed to send voice message: ${err?.message || 'Unknown error'}`);
+      return;
+    }
 
-      // 4. Insert metadata
-      const messageId = crypto.randomUUID();
+    // 4. Insert metadata (Supabase client — not a raw fetch(), but the 3rd network call)
+    const messageId = crypto.randomUUID();
+    try {
+      console.log("sendAudio: [supabase insert] requesting", { table: "messages", messageId });
       const { error: dbError } = await supabase.from('messages').insert({
           id: messageId,
           conversation_id: id,
@@ -162,13 +197,20 @@ export function VoiceRecorder({ onSent, onAudioPreview }: { onSent: () => void, 
           mime_type: audioBlob.type,
           byte_size: audioBlob.size
       });
+      console.log("sendAudio: [supabase insert] response", { hasError: !!dbError });
 
       if (dbError) {
           console.error("VOICE MESSAGE INSERT ERROR", { error: dbError });
           setError('Failed to save message.');
           return;
       }
+    } catch (err: any) {
+      console.error("sendAudio: [supabase insert] threw", { error: err, name: err?.name, message: err?.message, stack: err?.stack });
+      setError(`Failed to send voice message: ${err?.message || 'Unknown error'}`);
+      return;
+    }
 
+    try {
       await MediaCache.putMedia({
           messageId: messageId,
           mediaType: 'voice',
@@ -179,13 +221,13 @@ export function VoiceRecorder({ onSent, onAudioPreview }: { onSent: () => void, 
           sha256: sha256,
           deliveryStatus: 'pending'
       });
-
-      setAudioBlob(null);
-      onSent();
     } catch (err: any) {
-      console.error("sendAudio: unexpected error", err);
-      setError(`Failed to send voice message: ${err?.message || 'Unknown error'}`);
+      console.error("sendAudio: [MediaCache.putMedia] threw", { error: err, stack: err?.stack });
+      // Non-fatal: the message is already saved server-side, so don't block on local cache failure.
     }
+
+    setAudioBlob(null);
+    onSent();
   };
 
   return (
@@ -215,4 +257,4 @@ export function VoiceRecorder({ onSent, onAudioPreview }: { onSent: () => void, 
       </div>
     </div>
   );
-}
+        }
