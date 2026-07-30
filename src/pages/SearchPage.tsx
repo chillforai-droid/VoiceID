@@ -79,7 +79,7 @@ export default function SearchPage() {
               className="flex items-center gap-4 p-4 sm:p-5 bg-white border border-gray-100 rounded-3xl cursor-pointer hover:shadow-lg hover:border-gray-200 transition-all"
             >
               <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-gray-100 overflow-hidden border border-gray-200 shrink-0">
-                {user.avatar_url && <img src={user.avatar_url} alt={user.display_name} className="w-full h-full object-cover"/>}
+                {user.avatar_url && <img src={user.avatar_url} alt={user.display_name} loading="lazy" decoding="async" className="w-full h-full object-cover"/>}
               </div>
               <div className="min-w-0">
                 <p className="font-semibold text-base sm:text-lg truncate">{user.display_name}</p>

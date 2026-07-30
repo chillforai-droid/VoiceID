@@ -1,15 +1,25 @@
-import { useState, useRef } from 'react';
+import { memo, useState, useRef, useEffect } from 'react';
 import { Play, Loader2, Pause } from 'lucide-react';
 import { VoiceAudioCache } from '../../lib/VoiceAudioCache';
 import { MediaCache } from '../../lib/MediaCache';
 import { supabase } from '../../lib/supabase';
 import { fetchAndCacheMedia } from '../../lib/mediaDownload';
 
-export function VoiceMessage({ message }: { message: any }) {
+function VoiceMessageImpl({ message }: { message: any }) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  // Blob URL backing the current <audio> element, if any — revoked before
+  // creating the next one and on unmount so it can't leak.
+  const objectUrlRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    return () => {
+      audioRef.current?.pause();
+      if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current);
+    };
+  }, []);
 
   const playAudio = async () => {
     if (isPlaying) {
@@ -44,7 +54,10 @@ export function VoiceMessage({ message }: { message: any }) {
         }
       }
 
-      const audio = new Audio(URL.createObjectURL(blob));
+      if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current);
+      const objectUrl = URL.createObjectURL(blob);
+      objectUrlRef.current = objectUrl;
+      const audio = new Audio(objectUrl);
       audioRef.current = audio;
       audio.onended = () => setIsPlaying(false);
       await audio.play();
@@ -67,3 +80,8 @@ export function VoiceMessage({ message }: { message: any }) {
     </div>
   );
 }
+
+// Memoized for the same reason as ImageMessage: prevents the whole chat
+// message list re-rendering (and re-checking playback state) from
+// touching every voice bubble on unrelated state changes.
+export const VoiceMessage = memo(VoiceMessageImpl, (prev, next) => prev.message.id === next.message.id);

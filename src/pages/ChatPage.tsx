@@ -4,9 +4,8 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { useNotifications } from '../context/NotificationContext';
 import { Send, Loader2, ArrowLeft, Phone, Image as ImageIcon } from 'lucide-react';
-import { ImageMessage } from '../components/chat/ImageMessage';
 import { VoiceRecorder } from '../components/chat/VoiceRecorder';
-import { VoiceMessage } from '../components/chat/VoiceMessage';
+import { MessageBubble } from '../components/chat/MessageBubble';
 import { ConfirmDialog } from '../components/chat/ConfirmDialog';
 import { MediaCache } from '../lib/MediaCache';
 import { useVoiceCall } from '../hooks/useVoiceCall';
@@ -40,7 +39,9 @@ export default function ChatPage() {
     // Reset file input
     e.target.value = '';
     
-    // Set preview
+    // Set preview (revoking any previous preview URL first so we don't
+    // accumulate Blob URLs across multiple attachments in one session)
+    if (previewImage) URL.revokeObjectURL(previewImage);
     setPreviewImage(URL.createObjectURL(file));
     
     const arrayBuffer = await file.arrayBuffer();
@@ -93,7 +94,7 @@ export default function ChatPage() {
             sha256: sha256,
             deliveryStatus: 'delivered'
         });
-        setPreviewImage(null);
+        setPreviewImage(prev => { if (prev) URL.revokeObjectURL(prev); return null; });
     }
   };
 
@@ -156,6 +157,13 @@ export default function ChatPage() {
   }, [id, user, authLoading]);
 
   useEffect(() => { scrollRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
+
+  // Safety net: revoke the attachment preview URL if the user navigates
+  // away mid-upload instead of cancelling or completing it.
+  useEffect(() => {
+    return () => { if (previewImage) URL.revokeObjectURL(previewImage); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Deep link support: notifications for a specific message (e.g. a new
   // message notification) can carry ?m=<messageId> so we scroll straight
@@ -262,7 +270,7 @@ export default function ChatPage() {
             <ArrowLeft size={20} className="text-gray-600" />
         </button>
         <div className="w-10 h-10 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold overflow-hidden shrink-0">
-             {otherUser?.profiles?.avatar_url ? <img src={otherUser.profiles.avatar_url} alt="" className="w-full h-full object-cover" /> : otherUser?.profiles?.display_name?.charAt(0)}
+             {otherUser?.profiles?.avatar_url ? <img src={otherUser.profiles.avatar_url} alt="" decoding="async" className="w-full h-full object-cover" /> : otherUser?.profiles?.display_name?.charAt(0)}
         </div>
         <div className="flex-1 min-w-0 font-semibold text-gray-900 truncate">{otherUser?.profiles?.display_name || 'Conversation'}</div>
         {otherUser && (
@@ -277,39 +285,21 @@ export default function ChatPage() {
       
       <div className="flex-1 overflow-y-auto overflow-x-hidden p-3 sm:p-4 space-y-3 sm:space-y-4">
         {messages.map((m) => (
-          <div id={`msg-${m.id}`} key={m.id} className={`flex flex-col ${m.sender_id === user?.id ? 'items-end' : 'items-start'} group transition-colors rounded-2xl ${highlightedMessageId === m.id ? 'ring-2 ring-blue-400 bg-blue-50/60' : ''}`} onClick={() => setSelectedMessageId(selectedMessageId === m.id ? null : m.id)}>
-            <div className={`p-3 px-4 rounded-2xl max-w-[88%] sm:max-w-[75%] md:max-w-[65%] break-words ${m.sender_id === user?.id ? 'bg-blue-600 text-white rounded-tr-sm' : 'bg-white text-gray-900 rounded-tl-sm border border-gray-100'}`}>
-              {editingMessage?.id === m.id ? (
-                <div className='flex flex-wrap gap-2 items-center' onClick={e => e.stopPropagation()}>
-                    <input
-                      value={editContent}
-                      onChange={e => setEditContent(e.target.value)}
-                      autoFocus
-                      className='text-black p-2 rounded-lg min-w-0 flex-1 outline-none focus:ring-2 focus:ring-white/50'
-                    />
-                    <div className="flex gap-2 shrink-0">
-                      <button onClick={e => { e.stopPropagation(); updateMessage(); }} className='text-xs bg-white text-blue-600 px-3 py-1.5 rounded-full font-medium'>Save</button>
-                      <button onClick={e => { e.stopPropagation(); setEditingMessage(null); }} className='text-xs text-blue-100 px-2 py-1.5'>Cancel</button>
-                    </div>
-                </div>
-              ) : (
-                <>
-                    {m.content_type === 'voice' ? <VoiceMessage message={m} /> : (m.content_type === 'image' ? <ImageMessage message={m} /> : <span className="whitespace-pre-wrap [overflow-wrap:anywhere]">{m.content_body}</span>)}
-                    <p className={`text-[10px] mt-1 ${m.sender_id === user?.id ? 'text-blue-100' : 'text-gray-400'}`}>
-                        {new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                    </p>
-                </>
-              )}
-            </div>
-            {m.sender_id === user?.id && !editingMessage && selectedMessageId === m.id && (
-                <div className="flex items-center gap-4 mt-1 px-1" onClick={e => e.stopPropagation()}>
-                    {m.content_type === 'text' && (
-                        <button onClick={e => { e.stopPropagation(); setEditingMessage(m); setEditContent(m.content_body.replace(" (edited)", "")); setSelectedMessageId(null); }} className="text-xs text-blue-600 font-medium hover:text-blue-800 py-1">Edit</button>
-                    )}
-                    <button onClick={e => { e.stopPropagation(); setMessageToDelete(m); setSelectedMessageId(null); }} className="text-xs text-red-600 font-medium hover:text-red-800 py-1">Delete</button>
-                </div>
-            )}
-          </div>
+          <MessageBubble
+            key={m.id}
+            message={m}
+            isOwn={m.sender_id === user?.id}
+            isHighlighted={highlightedMessageId === m.id}
+            isSelected={selectedMessageId === m.id}
+            isEditing={editingMessage?.id === m.id}
+            editContent={editContent}
+            onEditContentChange={setEditContent}
+            onSaveEdit={updateMessage}
+            onCancelEdit={() => setEditingMessage(null)}
+            onToggleSelect={() => setSelectedMessageId(selectedMessageId === m.id ? null : m.id)}
+            onStartEdit={() => { setEditingMessage(m); setEditContent(m.content_body.replace(" (edited)", "")); setSelectedMessageId(null); }}
+            onRequestDelete={() => { setMessageToDelete(m); setSelectedMessageId(null); }}
+          />
         ))}
         <div ref={scrollRef} />
       </div>
@@ -327,8 +317,8 @@ export default function ChatPage() {
       
       {previewImage && (
         <div className="p-2 border-t bg-white flex items-center gap-3">
-          <img src={previewImage} alt="Preview" className="h-16 w-16 sm:h-20 sm:w-20 rounded object-cover" />
-          <button onClick={() => setPreviewImage(null)} className="text-sm text-gray-600 hover:text-gray-900 px-3 py-1.5 rounded-full hover:bg-gray-100">Cancel</button>
+          <img src={previewImage} alt="Preview" loading="lazy" decoding="async" className="h-16 w-16 sm:h-20 sm:w-20 rounded object-cover" />
+          <button onClick={() => { URL.revokeObjectURL(previewImage); setPreviewImage(null); }} className="text-sm text-gray-600 hover:text-gray-900 px-3 py-1.5 rounded-full hover:bg-gray-100">Cancel</button>
         </div>
       )}
       

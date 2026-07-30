@@ -16,6 +16,11 @@ export function VoiceRecorder({ onSent, onAudioPreview }: { onSent: () => void, 
   const streamRef = useRef<MediaStream | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const startTimeRef = useRef<number>(0);
+  // Preview playback: reuse one object URL / Audio instance instead of
+  // creating a new one on every click of the preview-play button, which
+  // previously leaked a Blob URL each time.
+  const previewUrlRef = useRef<string | null>(null);
+  const previewAudioRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
     if (onAudioPreview) {
@@ -29,6 +34,8 @@ export function VoiceRecorder({ onSent, onAudioPreview }: { onSent: () => void, 
       if (streamRef.current) {
         streamRef.current.getTracks().forEach(track => track.stop());
       }
+      previewAudioRef.current?.pause();
+      if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current);
     };
   }, []);
 
@@ -82,6 +89,28 @@ export function VoiceRecorder({ onSent, onAudioPreview }: { onSent: () => void, 
         streamRef.current.getTracks().forEach(track => track.stop());
       }
     }
+  };
+
+  const playPreview = () => {
+    if (!audioBlob) return;
+    if (!previewUrlRef.current) {
+      previewUrlRef.current = URL.createObjectURL(audioBlob);
+    }
+    if (!previewAudioRef.current) {
+      previewAudioRef.current = new Audio(previewUrlRef.current);
+    }
+    previewAudioRef.current.currentTime = 0;
+    previewAudioRef.current.play();
+  };
+
+  const discardPreview = () => {
+    previewAudioRef.current?.pause();
+    if (previewUrlRef.current) {
+      URL.revokeObjectURL(previewUrlRef.current);
+      previewUrlRef.current = null;
+    }
+    previewAudioRef.current = null;
+    setAudioBlob(null);
   };
 
   const sendAudio = async () => {
@@ -189,6 +218,11 @@ export function VoiceRecorder({ onSent, onAudioPreview }: { onSent: () => void, 
       // Non-fatal: the message is already saved server-side, so don't block on local cache failure.
     }
 
+    if (previewUrlRef.current) {
+      URL.revokeObjectURL(previewUrlRef.current);
+      previewUrlRef.current = null;
+    }
+    previewAudioRef.current = null;
     setAudioBlob(null);
     onSent();
   };
@@ -199,8 +233,8 @@ export function VoiceRecorder({ onSent, onAudioPreview }: { onSent: () => void, 
       <div className="flex items-center gap-2">
         {audioBlob ? (
           <>
-            <button type="button" onClick={() => setAudioBlob(null)} className="p-3 text-gray-500 hover:bg-gray-100 rounded-full"><X size={20} /></button>
-            <button type="button" onClick={() => new Audio(URL.createObjectURL(audioBlob)).play()} className="p-3 bg-gray-100 text-gray-700 rounded-full"><Play size={20} /></button>
+            <button type="button" onClick={discardPreview} className="p-3 text-gray-500 hover:bg-gray-100 rounded-full"><X size={20} /></button>
+            <button type="button" onClick={playPreview} className="p-3 bg-gray-100 text-gray-700 rounded-full"><Play size={20} /></button>
             <button
               type="button"
               onClick={() => sendAudio()}

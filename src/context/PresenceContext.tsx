@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState, useRef } from 'react';
+import React, { createContext, useContext, useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from './AuthContext';
 
@@ -43,10 +43,12 @@ export const PresenceProvider = ({ children }: { children: React.ReactNode }) =>
         };
     }, [user]);
 
-    const isUserOnline = (userId: string) => onlineUsers.has(userId);
+    const isUserOnline = useCallback((userId: string) => onlineUsers.has(userId), [onlineUsers]);
+
+    const value = useMemo(() => ({ onlineUsers, isUserOnline }), [onlineUsers, isUserOnline]);
 
     return (
-        <PresenceContext.Provider value={{ onlineUsers, isUserOnline }}>
+        <PresenceContext.Provider value={value}>
             {children}
         </PresenceContext.Provider>
     );

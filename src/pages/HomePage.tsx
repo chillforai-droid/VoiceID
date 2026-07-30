@@ -16,7 +16,7 @@ export default function HomePage() {
     <div className="max-w-xl mx-auto space-y-8 p-4">
       <div className="flex items-center gap-4 min-w-0">
         {profile?.avatar_url ? (
-          <img src={profile.avatar_url} alt={displayName} className="w-16 h-16 rounded-full object-cover shrink-0" />
+          <img src={profile.avatar_url} alt={displayName} decoding="async" className="w-16 h-16 rounded-full object-cover shrink-0" />
         ) : (
           <div className="w-16 h-16 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-xl font-bold shrink-0">
             {displayName.charAt(0).toUpperCase()}

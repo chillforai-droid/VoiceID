@@ -144,7 +144,7 @@ export default function EditProfilePage() {
         <label className="block text-sm font-medium text-gray-700">Avatar</label>
         <div className="flex items-center gap-4">
             <div className="w-20 h-20 rounded-full bg-gray-100 border overflow-hidden">
-                {profile?.avatar_url && <img key={profile.avatar_url} src={profile.avatar_url} className="w-full h-full object-cover" />}
+                {profile?.avatar_url && <img key={profile.avatar_url} src={profile.avatar_url} decoding="async" className="w-full h-full object-cover" />}
             </div>
             <label className="px-4 py-2 bg-blue-50 text-blue-600 rounded-full cursor-pointer hover:bg-blue-100 flex items-center gap-2">
                 {uploading ? <Loader2 className="animate-spin" size={16}/> : <Camera size={16}/>} Change Photo

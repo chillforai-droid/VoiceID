@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useRef, useState, useCallback } from 'react';
+import { createContext, useContext, useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from './AuthContext';
 
@@ -197,12 +197,16 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
     await supabase.from('notifications').delete().eq('user_id', user.id);
   }, [user]);
 
-  return (
-    <NotificationContext.Provider value={{
-      notifications, unreadCount, unreadMessageCount, loading, loadingMore, hasMore,
+  const value = useMemo(() => ({
+    notifications, unreadCount, unreadMessageCount, loading, loadingMore, hasMore,
+    fetchMore, markAsRead, markAllRead, markConversationRead, deleteNotification, clearAll,
+    setActiveConversationId,
+  }), [notifications, unreadCount, unreadMessageCount, loading, loadingMore, hasMore,
       fetchMore, markAsRead, markAllRead, markConversationRead, deleteNotification, clearAll,
-      setActiveConversationId,
-    }}>
+      setActiveConversationId]);
+
+  return (
+    <NotificationContext.Provider value={value}>
       {children}
     </NotificationContext.Provider>
   );

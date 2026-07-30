@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { X, Check } from 'lucide-react';
 import { AppNotification } from '../../context/NotificationContext';
 import { getNotificationMeta } from '../../lib/notificationNav';
@@ -13,7 +14,7 @@ interface NotificationItemProps {
   onDecline?: (n: AppNotification) => void;
 }
 
-export default function NotificationItem({ notification, onOpen, onDelete, compact, onAccept, onDecline }: NotificationItemProps) {
+function NotificationItemImpl({ notification, onOpen, onDelete, compact, onAccept, onDecline }: NotificationItemProps) {
   const meta = getNotificationMeta(notification.type);
   const Icon = meta.icon;
   const isFriendRequest = notification.type === 'friend_request';
@@ -83,3 +84,6 @@ export default function NotificationItem({ notification, onOpen, onDelete, compa
     </div>
   );
 }
+
+const NotificationItem = memo(NotificationItemImpl);
+export default NotificationItem;

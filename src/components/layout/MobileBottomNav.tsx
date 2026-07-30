@@ -1,9 +1,10 @@
+import { memo } from 'react';
 import { Home, Search, MessageSquare, Bell, User } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useNotifications } from '../../context/NotificationContext';
 
-export default function MobileBottomNav() {
+function MobileBottomNav() {
   const { user } = useAuth();
   const { unreadCount, unreadMessageCount } = useNotifications();
 
@@ -39,3 +40,5 @@ export default function MobileBottomNav() {
     </nav>
   );
 }
+
+export default memo(MobileBottomNav);

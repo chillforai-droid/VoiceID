@@ -9,7 +9,7 @@ interface AvatarProps {
 
 export const Avatar: React.FC<AvatarProps> = ({ url, displayName, className = "w-10 h-10" }) => {
   if (url) {
-    return <img src={url} alt={displayName || 'Avatar'} className={`${className} rounded-full object-cover`} />;
+    return <img src={url} alt={displayName || 'Avatar'} loading="lazy" decoding="async" className={`${className} rounded-full object-cover`} />;
   }
 
   const initials = displayName

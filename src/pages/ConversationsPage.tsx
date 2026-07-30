@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { useNotifications } from '../context/NotificationContext';
@@ -11,6 +11,10 @@ export default function ConversationsPage() {
   const [conversations, setConversations] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
+  // Coalesces refetches: the 'conversations' and 'messages' realtime
+  // channels can both fire for the same underlying change, which
+  // previously triggered two full refetches back-to-back.
+  const refetchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (authLoading) return;
@@ -48,20 +52,26 @@ export default function ConversationsPage() {
       setLoading(false);
     };
 
+    const scheduleRefetch = () => {
+      if (refetchTimeoutRef.current) clearTimeout(refetchTimeoutRef.current);
+      refetchTimeoutRef.current = setTimeout(fetchConversations, 150);
+    };
+
     fetchConversations();
-    
+
     // Real-time
     const subscription = supabase
       .channel('conversations')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'conversations' }, fetchConversations)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'conversations' }, scheduleRefetch)
       .subscribe();
 
     const messageSubscription = supabase
       .channel('messages')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, fetchConversations)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, scheduleRefetch)
       .subscribe();
 
-    return () => { 
+    return () => {
+        if (refetchTimeoutRef.current) clearTimeout(refetchTimeoutRef.current);
         supabase.removeChannel(subscription);
         supabase.removeChannel(messageSubscription);
     };
@@ -92,7 +102,7 @@ export default function ConversationsPage() {
               >
                 <div className="w-12 h-12 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold text-lg overflow-hidden shrink-0">
                     {otherMember?.avatar_url ? (
-                        <img src={otherMember.avatar_url} alt={name} className="w-full h-full object-cover"/>
+                        <img src={otherMember.avatar_url} alt={name} loading="lazy" decoding="async" className="w-full h-full object-cover"/>
                     ) : (
                         name.charAt(0).toUpperCase()
                     )}

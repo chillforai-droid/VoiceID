@@ -25,7 +25,7 @@ export const CallManager = () => {
             <audio ref={remoteAudioRef} autoPlay playsInline />
             {otherProfile && (
                 <div className="w-24 h-24 rounded-full bg-gray-100 mb-6 overflow-hidden">
-                    {otherProfile.avatar_url && <img src={otherProfile.avatar_url} alt={otherProfile.display_name} className="w-full h-full object-cover" />}
+                    {otherProfile.avatar_url && <img src={otherProfile.avatar_url} alt={otherProfile.display_name} decoding="async" className="w-full h-full object-cover" />}
                 </div>
             )}
             

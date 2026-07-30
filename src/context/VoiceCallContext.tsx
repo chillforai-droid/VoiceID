@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useRef, useState, useCallback } from 'react';
+import React, { createContext, useContext, useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { supabase } from '../lib/supabase';
 import { RealtimeChannel } from '@supabase/supabase-js';
 import { useAuth } from './AuthContext';
@@ -22,6 +22,12 @@ interface VoiceCallContextType {
 
 const VoiceCallContext = createContext<VoiceCallContextType>({} as VoiceCallContextType);
 
+// Static across the app's lifetime — hoisted out of the component so it
+// isn't reallocated on every VoiceCallProvider render.
+const ICE_SERVERS = {
+  iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+};
+
 export const VoiceCallProvider = ({ children }: { children: React.ReactNode }) => {
   const { user } = useAuth();
   const { isUserOnline } = usePresence();
@@ -44,10 +50,6 @@ export const VoiceCallProvider = ({ children }: { children: React.ReactNode }) =
       }
   }, []);
 
-  const iceServers = {
-    iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
-  };
-
   const cleanupCall = useCallback(() => {
     if (peerConnection.current) {
       peerConnection.current.close();
@@ -69,7 +71,7 @@ export const VoiceCallProvider = ({ children }: { children: React.ReactNode }) =
     if (remoteAudioRef.current) remoteAudioRef.current.srcObject = null;
   }, []);
 
-  const toggleMute = () => {
+  const toggleMute = useCallback(() => {
     if (localStream.current) {
       const audioTrack = localStream.current.getAudioTracks()[0];
       if (audioTrack) {
@@ -77,9 +79,9 @@ export const VoiceCallProvider = ({ children }: { children: React.ReactNode }) =
         setIsMuted(!audioTrack.enabled);
       }
     }
-  };
+  }, []);
 
-  const toggleSpeaker = async () => {
+  const toggleSpeaker = useCallback(async () => {
       if (remoteAudioRef.current && 'setSinkId' in remoteAudioRef.current) {
           try {
               const newSpeakerState = !isSpeakerOn;
@@ -90,7 +92,7 @@ export const VoiceCallProvider = ({ children }: { children: React.ReactNode }) =
               // Given the constraints, I will attempt to toggle between default and the first loudspeaker device if possible.
               const devices = await navigator.mediaDevices.enumerateDevices();
               const audioOutputs = devices.filter(d => d.kind === 'audiooutput');
-              
+
               if (newSpeakerState) {
                   // Find a speaker
                   const speaker = audioOutputs.find(d => d.label.toLowerCase().includes('speaker')) || audioOutputs[audioOutputs.length - 1];
@@ -103,7 +105,7 @@ export const VoiceCallProvider = ({ children }: { children: React.ReactNode }) =
               console.error('Failed to toggle speaker', e);
           }
       }
-  };
+  }, [isSpeakerOn]);
 
   const callsChannel = useRef<RealtimeChannel | null>(null);
 
@@ -114,7 +116,7 @@ export const VoiceCallProvider = ({ children }: { children: React.ReactNode }) =
 
     const channelName = `calls:${user.id}`;
     callsChannel.current = supabase.channel(channelName);
-    
+
     callsChannel.current.on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'calls', filter: `receiver_id=eq.${user.id}` }, (payload) => {
         if (payload.new.status === 'ringing') {
           setActiveCall(payload.new);
@@ -123,8 +125,8 @@ export const VoiceCallProvider = ({ children }: { children: React.ReactNode }) =
     });
 
     callsChannel.current.subscribe();
-    
-    return () => { 
+
+    return () => {
         if (callsChannel.current) {
             supabase.removeChannel(callsChannel.current);
             callsChannel.current = null;
@@ -135,25 +137,25 @@ export const VoiceCallProvider = ({ children }: { children: React.ReactNode }) =
   const canCallUser = useCallback(async (targetUserId: string): Promise<{canCall: boolean, reason?: string}> => {
       if (!user) return { canCall: false, reason: 'User not authenticated' };
       if (targetUserId === user.id) return { canCall: false, reason: 'Cannot call self' };
-      
+
       // Check online status
       if (!isUserOnline(targetUserId)) return { canCall: false, reason: 'User is offline' };
-      
+
       // Check friendship
       const { data: contact } = await supabase.from('contacts')
         .select('id')
         .or(`and(requester_id.eq.${user.id},responder_id.eq.${targetUserId}),and(requester_id.eq.${targetUserId},responder_id.eq.${user.id})`)
         .eq('status', 'accepted')
         .maybeSingle();
-      
+
       if (!contact) return { canCall: false, reason: 'Must be friends to call' };
-      
+
       return { canCall: true };
   }, [user, isUserOnline]);
 
-  const initiateCall = async (receiverId: string) => {
+  const initiateCall = useCallback(async (receiverId: string) => {
     if (!user || callState !== 'idle') return;
-    
+
     const { canCall, reason } = await canCallUser(receiverId);
     if (!canCall) {
         console.error('[CALL] cannot call:', reason);
@@ -161,10 +163,10 @@ export const VoiceCallProvider = ({ children }: { children: React.ReactNode }) =
         return;
     }
 
-    
+
     const { data: call, error } = await supabase.from('calls').insert({ caller_id: user.id, receiver_id: receiverId, status: 'ringing' }).select().single();
     if (error) { console.error('[CALL] create failed:', error); return; }
-    
+
     setActiveCall(call);
     setCallState('ringing-outgoing');
 
@@ -174,18 +176,18 @@ export const VoiceCallProvider = ({ children }: { children: React.ReactNode }) =
              cleanupCall();
         }
     }, 30000);
-    
+
     signallingChannel.current = supabase.channel(`voice-call:${call.id}`);
-    
+
     signallingChannel.current.on('broadcast', { event: 'receiver-ready' }, async () => {
         clearTimeout(timeout);
-        peerConnection.current = new RTCPeerConnection(iceServers);
-        const stream = await navigator.mediaDevices.getUserMedia({ 
+        peerConnection.current = new RTCPeerConnection(ICE_SERVERS);
+        const stream = await navigator.mediaDevices.getUserMedia({
             audio: {
                 echoCancellation: true,
                 noiseSuppression: true,
                 autoGainControl: true
-            } 
+            }
         });
         localStream.current = stream;
         stream.getTracks().forEach(track => peerConnection.current?.addTrack(track, stream));
@@ -209,22 +211,22 @@ export const VoiceCallProvider = ({ children }: { children: React.ReactNode }) =
         if (peerConnection.current?.remoteDescription) peerConnection.current.addIceCandidate(candidate);
         else iceCandidateQueue.current.push(candidate);
     });
-    
-    signallingChannel.current.subscribe();
-  };
 
-  const acceptCall = async () => {
+    signallingChannel.current.subscribe();
+  }, [user, callState, canCallUser, cleanupCall]);
+
+  const acceptCall = useCallback(async () => {
       if (!activeCall) return;
       setCallState('connecting');
       signallingChannel.current = supabase.channel(`voice-call:${activeCall.id}`);
       signallingChannel.current.on('broadcast', { event: 'offer' }, async ({ payload }) => {
-          peerConnection.current = new RTCPeerConnection(iceServers);
-          const stream = await navigator.mediaDevices.getUserMedia({ 
+          peerConnection.current = new RTCPeerConnection(ICE_SERVERS);
+          const stream = await navigator.mediaDevices.getUserMedia({
             audio: {
                 echoCancellation: true,
                 noiseSuppression: true,
                 autoGainControl: true
-            } 
+            }
         });
           localStream.current = stream;
           stream.getTracks().forEach(track => peerConnection.current?.addTrack(track, stream));
@@ -249,15 +251,20 @@ export const VoiceCallProvider = ({ children }: { children: React.ReactNode }) =
           signallingChannel.current!.send({ type: 'broadcast', event: 'receiver-ready' });
       });
       await supabase.from('calls').update({ status: 'accepted', answered_at: new Date().toISOString() }).eq('id', activeCall.id);
-  };
+  }, [activeCall]);
 
-  const endCall = async () => {
+  const endCall = useCallback(async () => {
     if (activeCall) await supabase.from('calls').update({ status: 'ended', ended_at: new Date().toISOString() }).eq('id', activeCall.id);
     cleanupCall();
-  };
+  }, [activeCall, cleanupCall]);
+
+  const value = useMemo(() => ({
+    callState, activeCall, initiateCall, acceptCall, endCall, cleanupCall, remoteAudioRef,
+    canCallUser, isMuted, toggleMute, isSpeakerOn, toggleSpeaker, isOutputSelectionSupported
+  }), [callState, activeCall, initiateCall, acceptCall, endCall, cleanupCall, canCallUser, isMuted, toggleMute, isSpeakerOn, toggleSpeaker, isOutputSelectionSupported]);
 
   return (
-    <VoiceCallContext.Provider value={{ callState, activeCall, initiateCall, acceptCall, endCall, cleanupCall, remoteAudioRef, canCallUser, isMuted, toggleMute, isSpeakerOn, toggleSpeaker, isOutputSelectionSupported }}>
+    <VoiceCallContext.Provider value={value}>
       {children}
     </VoiceCallContext.Provider>
   );

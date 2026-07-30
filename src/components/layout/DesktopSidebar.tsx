@@ -1,10 +1,11 @@
+import { memo } from 'react';
 import { Home, Search, Mail, Bell, Settings, LogOut, User } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useNotifications } from '../../context/NotificationContext';
 import NotificationBell from '../notifications/NotificationBell';
 
-export default function DesktopSidebar() {
+function DesktopSidebar() {
   const { user, signOut } = useAuth();
   const { unreadCount, unreadMessageCount } = useNotifications();
 
@@ -58,3 +59,5 @@ export default function DesktopSidebar() {
     </div>
   );
 }
+
+export default memo(DesktopSidebar);

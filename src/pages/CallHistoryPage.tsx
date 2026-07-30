@@ -83,7 +83,7 @@ export default function CallHistoryPage() {
               >
                 <div className="w-11 h-11 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold overflow-hidden shrink-0">
                   {other?.avatar_url ? (
-                    <img src={other.avatar_url} alt={other?.display_name || ''} className="w-full h-full object-cover" />
+                    <img src={other.avatar_url} alt={other?.display_name || ''} loading="lazy" decoding="async" className="w-full h-full object-cover" />
                   ) : (
                     (other?.display_name || '?').charAt(0).toUpperCase()
                   )}
