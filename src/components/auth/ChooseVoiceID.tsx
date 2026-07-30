@@ -2,13 +2,16 @@ import { useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { CheckCircle2 } from 'lucide-react';
 
 export default function ChooseVoiceID() {
   const [username, setUsername] = useState('');
   const [status, setStatus] = useState<'idle' | 'checking' | 'available' | 'taken' | 'invalid'>('idle');
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [success, setSuccess] = useState(false);
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, updateProfile } = useAuth();
 
   const checkAvailability = async (val: string) => {
     if (val.length < 3) { setStatus('invalid'); return; }
@@ -20,16 +23,40 @@ export default function ChooseVoiceID() {
   const createProfile = async () => {
     if (!user) { setSubmitError("User not authenticated"); return; }
     setSubmitError(null);
+    setSubmitting(true);
     const { error } = await supabase.from('profiles').insert({
         id: user.id,
         username: username.toLowerCase()
     });
     if (error) {
         setSubmitError(error.message);
-    } else {
-        navigate('/dashboard');
+        setSubmitting(false);
+        return;
     }
+
+    // Refresh the AuthContext's cached profile so ProtectedRoute sees the
+    // new username immediately — otherwise it still reads the stale
+    // (pre-signup) profile and bounces the user straight back here.
+    try {
+        await updateProfile();
+    } catch {
+        // Non-fatal: the profile row was created successfully either way.
+    }
+
+    setSubmitting(false);
+    setSuccess(true);
+    setTimeout(() => navigate('/dashboard'), 900);
   };
+
+  if (success) {
+    return (
+      <div className="min-h-screen bg-white flex flex-col items-center justify-center px-6 text-center">
+        <CheckCircle2 className="text-green-500 mb-4" size={48} />
+        <h1 className="text-2xl font-bold mb-2">You're all set, @{username.toLowerCase()}!</h1>
+        <p className="text-gray-500">Taking you to your dashboard…</p>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-white flex flex-col items-center justify-center px-6">
@@ -44,7 +71,9 @@ export default function ChooseVoiceID() {
             {status === 'available' ? 'Available' : status === 'taken' ? 'Taken' : 'Enter 3-25 lowercase characters'}
         </p>
         {submitError && <p className="text-red-500 text-sm mb-4">{submitError}</p>}
-        <button disabled={status !== 'available'} onClick={createProfile} className="w-full py-4 font-semibold text-white bg-black rounded-full hover:bg-gray-800 transition disabled:opacity-50">Continue</button>
+        <button disabled={status !== 'available' || submitting} onClick={createProfile} className="w-full py-4 font-semibold text-white bg-black rounded-full hover:bg-gray-800 transition disabled:opacity-50">
+            {submitting ? 'Creating…' : 'Continue'}
+        </button>
       </div>
     </div>
   );
