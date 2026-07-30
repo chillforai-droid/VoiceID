@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { useNotifications } from '../context/NotificationContext';
@@ -15,8 +15,9 @@ import { usePresence } from '../context/PresenceContext';
 export default function ChatPage() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { user, loading: authLoading } = useAuth();
-  const { markConversationRead } = useNotifications();
+  const { markConversationRead, setActiveConversationId } = useNotifications();
   const { initiateCall, canCallUser } = useVoiceCall();
   const { isUserOnline } = usePresence();
   const [messages, setMessages] = useState<any[]>([]);
@@ -106,6 +107,14 @@ export default function ChatPage() {
       }
   };
 
+  // Notification-system only: lets the bell/notifications page know this
+  // conversation is currently open, so new message notifications for it
+  // are marked read instantly instead of bumping the unread badge.
+  useEffect(() => {
+    setActiveConversationId(id ?? null);
+    return () => setActiveConversationId(null);
+  }, [id, setActiveConversationId]);
+
   useEffect(() => {
     if (id) markConversationRead(id);
     if (authLoading || !id || !user) return;
@@ -147,6 +156,23 @@ export default function ChatPage() {
   }, [id, user, authLoading]);
 
   useEffect(() => { scrollRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
+
+  // Deep link support: notifications for a specific message (e.g. a new
+  // message notification) can carry ?m=<messageId> so we scroll straight
+  // to it and briefly highlight it, then clean the param from the URL.
+  const [highlightedMessageId, setHighlightedMessageId] = useState<string | null>(null);
+  useEffect(() => {
+    const targetId = searchParams.get('m');
+    if (!targetId || messagesLoading) return;
+    const el = document.getElementById(`msg-${targetId}`);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      setHighlightedMessageId(targetId);
+      const timeout = setTimeout(() => setHighlightedMessageId(null), 2000);
+      setSearchParams(prev => { const next = new URLSearchParams(prev); next.delete('m'); return next; }, { replace: true });
+      return () => clearTimeout(timeout);
+    }
+  }, [searchParams, messagesLoading, setSearchParams]);
 
   const sendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -251,7 +277,7 @@ export default function ChatPage() {
       
       <div className="flex-1 overflow-y-auto overflow-x-hidden p-3 sm:p-4 space-y-3 sm:space-y-4">
         {messages.map((m) => (
-          <div key={m.id} className={`flex flex-col ${m.sender_id === user?.id ? 'items-end' : 'items-start'} group`} onClick={() => setSelectedMessageId(selectedMessageId === m.id ? null : m.id)}>
+          <div id={`msg-${m.id}`} key={m.id} className={`flex flex-col ${m.sender_id === user?.id ? 'items-end' : 'items-start'} group transition-colors rounded-2xl ${highlightedMessageId === m.id ? 'ring-2 ring-blue-400 bg-blue-50/60' : ''}`} onClick={() => setSelectedMessageId(selectedMessageId === m.id ? null : m.id)}>
             <div className={`p-3 px-4 rounded-2xl max-w-[88%] sm:max-w-[75%] md:max-w-[65%] break-words ${m.sender_id === user?.id ? 'bg-blue-600 text-white rounded-tr-sm' : 'bg-white text-gray-900 rounded-tl-sm border border-gray-100'}`}>
               {editingMessage?.id === m.id ? (
                 <div className='flex flex-wrap gap-2 items-center' onClick={e => e.stopPropagation()}>

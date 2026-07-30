@@ -25,6 +25,7 @@ import EditProfilePage from './pages/EditProfilePage';
 import NotificationsPage from './pages/NotificationsPage';
 import ConversationsPage from './pages/ConversationsPage';
 import ChatPage from './pages/ChatPage';
+import CallHistoryPage from './pages/CallHistoryPage';
 import SettingsPage from './pages/SettingsPage';
 import ContactPage from './pages/ContactPage';
 
@@ -60,6 +61,7 @@ export default function App() {
                   <Route path="profile/edit" element={<EditProfilePage />} />
                   <Route path="messages" element={<ConversationsPage />} />
                   <Route path="chat/:id" element={<ChatPage />} />
+                  <Route path="calls" element={<CallHistoryPage />} />
                   <Route path="notifications" element={<NotificationsPage />} />
                   <Route path="settings" element={<SettingsPage />} />
                 </Route>
