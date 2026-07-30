@@ -13,9 +13,23 @@ import PageLoader from './components/common/PageLoader';
 const LandingPage = lazy(() => import('./pages/LandingPage'));
 const Careers = lazy(() => import('./pages/Careers'));
 const Blog = lazy(() => import('./pages/Blog'));
+const BlogPost = lazy(() => import('./pages/BlogPost'));
+const BlogTopic = lazy(() => import('./pages/BlogTopic'));
 const PrivacyPolicy = lazy(() => import('./pages/PrivacyPolicy'));
 const TermsOfService = lazy(() => import('./pages/TermsOfService'));
 const ContactPage = lazy(() => import('./pages/ContactPage'));
+const NotFound = lazy(() => import('./pages/NotFound'));
+
+// SEO landing pages (keyword-targeted marketing pages)
+const SecureMessaging = lazy(() => import('./pages/landing/SecureMessaging'));
+const PrivateChat = lazy(() => import('./pages/landing/PrivateChat'));
+const VoiceMessaging = lazy(() => import('./pages/landing/VoiceMessaging'));
+const OnlineChat = lazy(() => import('./pages/landing/OnlineChat'));
+const BrowserChat = lazy(() => import('./pages/landing/BrowserChat'));
+const VideoCalls = lazy(() => import('./pages/landing/VideoCalls'));
+const FeaturesPage = lazy(() => import('./pages/landing/FeaturesPage'));
+const HelpPage = lazy(() => import('./pages/landing/HelpPage'));
+const PrivacyLanding = lazy(() => import('./pages/landing/PrivacyLanding'));
 
 // Auth flow
 const Welcome = lazy(() => import('./components/auth/Welcome'));
@@ -51,9 +65,20 @@ export default function App() {
                   <Route path="/" element={<LandingPage />} />
                   <Route path="/careers" element={<Careers />} />
                   <Route path="/blog" element={<Blog />} />
+                  <Route path="/blog/topic/:cluster" element={<BlogTopic />} />
+                  <Route path="/blog/:slug" element={<BlogPost />} />
                   <Route path="/privacy-policy" element={<PrivacyPolicy />} />
                   <Route path="/terms-of-service" element={<TermsOfService />} />
                   <Route path="/contact" element={<ContactPage />} />
+                  <Route path="/secure-messaging" element={<SecureMessaging />} />
+                  <Route path="/private-chat" element={<PrivateChat />} />
+                  <Route path="/voice-messaging" element={<VoiceMessaging />} />
+                  <Route path="/online-chat" element={<OnlineChat />} />
+                  <Route path="/browser-chat" element={<BrowserChat />} />
+                  <Route path="/video-calls" element={<VideoCalls />} />
+                  <Route path="/features" element={<FeaturesPage />} />
+                  <Route path="/help" element={<HelpPage />} />
+                  <Route path="/privacy" element={<PrivacyLanding />} />
                   <Route path="/auth/welcome" element={<Welcome />} />
                   <Route path="/auth/signup" element={<SignUp />} />
                   <Route path="/auth/login" element={<Login />} />
@@ -75,6 +100,7 @@ export default function App() {
                     <Route path="notifications" element={<NotificationsPage />} />
                     <Route path="settings" element={<SettingsPage />} />
                   </Route>
+                  <Route path="*" element={<NotFound />} />
                 </Routes>
               </Suspense>
             </BrowserRouter>

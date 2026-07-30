@@ -21,7 +21,20 @@ export default function UserProfilePage() {
   useSEO({
       title: profile ? `${profile.display_name} (@${profile.username}) | VoiceID` : 'VoiceID Profile',
       description: profile ? `Connect with @${profile.username} on VoiceID.` : 'VoiceID Profile',
-      canonical: profile ? `https://voiceid.online/u/${profile.username}` : `https://voiceid.online/`
+      canonical: profile ? `https://voiceid.online/u/${profile.username}` : `https://voiceid.online/`,
+      robots: profile ? 'index, follow' : 'noindex, follow',
+      jsonLd: profile ? [{
+        '@context': 'https://schema.org',
+        '@type': 'ProfilePage',
+        dateCreated: profile.created_at || undefined,
+        mainEntity: {
+          '@type': 'Person',
+          name: profile.display_name,
+          alternateName: profile.username,
+          url: `https://voiceid.online/u/${profile.username}`,
+          image: profile.avatar_url || undefined,
+        },
+      }] : undefined,
   });
 
   useEffect(() => {
