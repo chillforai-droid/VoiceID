@@ -12,6 +12,12 @@ import { useVoiceCall } from '../hooks/useVoiceCall';
 import { usePresence } from '../context/PresenceContext';
 
 export default function ChatPage() {
+  // Previously the entire conversation history was fetched in one
+  // unbounded query on every open — fine for a new conversation, but it
+  // gets slower and heavier (network + memory) the longer a conversation
+  // lives. This caps the initial load and pages older messages in on
+  // demand instead.
+  const PAGE_SIZE = 50;
   const { id } = useParams();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -20,6 +26,9 @@ export default function ChatPage() {
   const { initiateCall, canCallUser } = useVoiceCall();
   const { isUserOnline } = usePresence();
   const [messages, setMessages] = useState<any[]>([]);
+  const [hasMoreOlder, setHasMoreOlder] = useState(false);
+  const [loadingOlder, setLoadingOlder] = useState(false);
+  const deepLinkAttemptsRef = useRef(0);
   const [editingMessage, setEditingMessage] = useState<any>(null);
   const [editContent, setEditContent] = useState('');
   const [messageToDelete, setMessageToDelete] = useState<any>(null);
@@ -30,7 +39,15 @@ export default function ChatPage() {
   const [previewImage, setPreviewImage] = useState<string | null>(null);
   const [otherUser, setOtherUser] = useState<any>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
+  const topSentinelRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [otherUserTyping, setOtherUserTyping] = useState(false);
+  const [otherUserRecording, setOtherUserRecording] = useState(false);
+  const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+  const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const recordingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastTypingSentRef = useRef(0);
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -125,9 +142,13 @@ export default function ChatPage() {
         .from('messages')
         .select('*, profiles(display_name)')
         .eq('conversation_id', id)
-        .order('created_at', { ascending: true });
+        .order('created_at', { ascending: false })
+        .limit(PAGE_SIZE);
 
-      if (!error && data) setMessages(data);
+      if (!error && data) {
+        setMessages([...data].reverse());
+        setHasMoreOlder(data.length === PAGE_SIZE);
+      }
       setMessagesLoading(false);
 
       const { data: members } = await supabase.from('conversation_members').select('user_id, profiles(display_name, avatar_url)').eq('conversation_id', id).neq('user_id', user.id);
@@ -140,7 +161,16 @@ export default function ChatPage() {
       .channel(`messages:${id}`)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `conversation_id=eq.${id}` }, (payload) => {
         setMessages(prev => {
-          if (prev.find(m => m.id === payload.new.id)) return prev;
+          const existingIdx = prev.findIndex(m => m.id === payload.new.id);
+          if (existingIdx !== -1) {
+            // Confirms an optimistic (locally-echoed) message this client
+            // sent itself — replace the placeholder with the real row
+            // instead of dropping the realtime event, so it doesn't get
+            // stuck showing "Sending..." forever.
+            const next = [...prev];
+            next[existingIdx] = payload.new;
+            return next;
+          }
           return [...prev, payload.new].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
         });
       })
@@ -150,13 +180,55 @@ export default function ChatPage() {
       .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'messages', filter: `conversation_id=eq.${id}` }, (payload) => {
         setMessages(prev => prev.filter(m => m.id !== payload.old.id));
       })
+      // Typing indicator: ephemeral broadcast on the same channel already
+      // subscribed for message changes (Realtime multiplexes postgres_changes
+      // and broadcast over one connection, so this doesn't need a second
+      // channel/subscription). Not persisted anywhere — purely presence-like.
+      .on('broadcast', { event: 'typing' }, (payload) => {
+        if (payload.payload?.user_id === user.id) return;
+        setOtherUserTyping(true);
+        if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+        typingTimeoutRef.current = setTimeout(() => setOtherUserTyping(false), 3000);
+      })
+      // Recording indicator: same ephemeral-broadcast approach as typing.
+      // The sender re-sends every ~2s while actively recording (see
+      // ChatPage's onRecordingStateChange handler), and explicitly sends
+      // {recording:false} on stop; the 4s decay here is just a safety net
+      // in case that final event is lost (e.g. tab closed mid-recording).
+      .on('broadcast', { event: 'recording' }, (payload) => {
+        if (payload.payload?.user_id === user.id) return;
+        if (recordingTimeoutRef.current) clearTimeout(recordingTimeoutRef.current);
+        if (payload.payload?.recording) {
+          setOtherUserRecording(true);
+          recordingTimeoutRef.current = setTimeout(() => setOtherUserRecording(false), 4000);
+        } else {
+          setOtherUserRecording(false);
+        }
+      })
       .subscribe((status) => {
       });
 
-    return () => { supabase.removeChannel(subscription); };
+    channelRef.current = subscription;
+
+    return () => {
+      supabase.removeChannel(subscription);
+      channelRef.current = null;
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+      if (recordingTimeoutRef.current) clearTimeout(recordingTimeoutRef.current);
+      if (recordingBroadcastIntervalRef.current) clearInterval(recordingBroadcastIntervalRef.current);
+      setOtherUserTyping(false);
+      setOtherUserRecording(false);
+    };
   }, [id, user, authLoading]);
 
-  useEffect(() => { scrollRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
+  // Guarded so loading older history (prepended to the top) doesn't yank
+  // the view back down to the bottom — only new messages at the end
+  // (or the initial load) should trigger an auto-scroll.
+  const skipAutoScrollRef = useRef(false);
+  useEffect(() => {
+    if (skipAutoScrollRef.current) { skipAutoScrollRef.current = false; return; }
+    scrollRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
 
   // Safety net: revoke the attachment preview URL if the user navigates
   // away mid-upload instead of cancelling or completing it.
@@ -165,46 +237,175 @@ export default function ChatPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const loadOlderMessages = async () => {
+    if (loadingOlder || !hasMoreOlder || messages.length === 0 || !id) return;
+    setLoadingOlder(true);
+    const oldest = messages[0];
+    const { data, error } = await supabase
+      .from('messages')
+      .select('*, profiles(display_name)')
+      .eq('conversation_id', id)
+      .lt('created_at', oldest.created_at)
+      .order('created_at', { ascending: false })
+      .limit(PAGE_SIZE);
+
+    if (!error && data) {
+      skipAutoScrollRef.current = true;
+      setMessages(prev => [...[...data].reverse(), ...prev]);
+      setHasMoreOlder(data.length === PAGE_SIZE);
+    }
+    setLoadingOlder(false);
+  };
+
   // Deep link support: notifications for a specific message (e.g. a new
   // message notification) can carry ?m=<messageId> so we scroll straight
   // to it and briefly highlight it, then clean the param from the URL.
+  // Since messages now load a page at a time (see PAGE_SIZE above), an
+  // older linked message may not be in the first page yet — this keeps
+  // paging older messages in until it's found, up to a sane bound.
   const [highlightedMessageId, setHighlightedMessageId] = useState<string | null>(null);
   useEffect(() => {
     const targetId = searchParams.get('m');
     if (!targetId || messagesLoading) return;
     const el = document.getElementById(`msg-${targetId}`);
     if (el) {
+      deepLinkAttemptsRef.current = 0;
       el.scrollIntoView({ behavior: 'smooth', block: 'center' });
       setHighlightedMessageId(targetId);
       const timeout = setTimeout(() => setHighlightedMessageId(null), 2000);
       setSearchParams(prev => { const next = new URLSearchParams(prev); next.delete('m'); return next; }, { replace: true });
       return () => clearTimeout(timeout);
     }
-  }, [searchParams, messagesLoading, setSearchParams]);
+    // Not found in what's currently loaded — page in older history and
+    // this effect will re-run once `messages` updates. Bounded so a
+    // stale/invalid message id (e.g. it was since deleted) doesn't loop
+    // forever paging through the entire conversation.
+    if (hasMoreOlder && !loadingOlder && deepLinkAttemptsRef.current < 20) {
+      deepLinkAttemptsRef.current += 1;
+      loadOlderMessages();
+    }
+  }, [searchParams, messagesLoading, setSearchParams, messages, hasMoreOlder, loadingOlder]);
+
+  const loadOlderRef = useRef(loadOlderMessages);
+  useEffect(() => { loadOlderRef.current = loadOlderMessages; });
+
+  useEffect(() => {
+    if (!hasMoreOlder) return;
+    const sentinel = topSentinelRef.current;
+    const container = messagesContainerRef.current;
+    if (!sentinel || !container) return;
+    const observer = new IntersectionObserver((entries) => {
+      if (entries[0].isIntersecting) loadOlderRef.current();
+    }, { root: container, threshold: 0.1 });
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [hasMoreOlder, id, messagesLoading]);
+
+  const recordingBroadcastIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const handleRecordingStateChange = (isRecording: boolean) => {
+    if (!channelRef.current || !user) return;
+    const send = () => channelRef.current?.send({ type: 'broadcast', event: 'recording', payload: { user_id: user.id, recording: isRecording } });
+    send();
+    if (recordingBroadcastIntervalRef.current) clearInterval(recordingBroadcastIntervalRef.current);
+    if (isRecording) {
+      recordingBroadcastIntervalRef.current = setInterval(send, 2000);
+    }
+  };
+
+  const handleMessageInputChange = (value: string) => {
+    setNewMessage(value);
+    // Throttle to at most once every 2s so every keystroke doesn't send a
+    // broadcast — the receiving side already holds "typing" for 3s after
+    // the last event, so this cadence keeps the indicator feeling live
+    // without spamming the channel.
+    const now = Date.now();
+    if (value.trim() && now - lastTypingSentRef.current > 2000 && channelRef.current && user) {
+      lastTypingSentRef.current = now;
+      channelRef.current.send({ type: 'broadcast', event: 'typing', payload: { user_id: user.id } });
+    }
+  };
 
   const sendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newMessage.trim() || !user || !id) return;
+    const content = newMessage.trim();
+    if (!content || !user || !id) return;
+
+    setNewMessage('');
+
+    // Optimistic local echo: previously the message only appeared once the
+    // realtime subscription echoed the INSERT back, which meant a visible
+    // delay on every send and, if realtime was briefly disconnected, your
+    // own message wouldn't show up at all until it reconnected. The id is
+    // generated client-side (same pattern already used for voice messages)
+    // so the realtime INSERT handler above can reconcile it by id.
+    const clientId = crypto.randomUUID();
+    setMessages(prev => [...prev, {
+      id: clientId,
+      conversation_id: id,
+      sender_id: user.id,
+      content_body: content,
+      content_type: 'text',
+      created_at: new Date().toISOString(),
+      _status: 'sending',
+    }]);
 
     const { data, error } = await supabase.from('messages').insert({
+      id: clientId,
       conversation_id: id,
       sender_id: user?.id,
-      content_body: newMessage,
+      content_body: content,
       content_type: 'text'
     }).select().single();
-    
+
     if (error) {
         console.error('Message insert error:', error);
-        alert(`Failed to save message. Details: ${error.message}`);
+        setMessages(prev => prev.map(m => m.id === clientId ? { ...m, _status: 'failed' } : m));
     } else {
-        setNewMessage('');
+        setMessages(prev => prev.map(m => m.id === clientId ? data : m));
+    }
+  };
+
+  const retrySendMessage = async (m: any) => {
+    setMessages(prev => prev.map(msg => msg.id === m.id ? { ...msg, _status: 'sending' } : msg));
+    const { data, error } = await supabase.from('messages').insert({
+      id: m.id,
+      conversation_id: id,
+      sender_id: user?.id,
+      content_body: m.content_body,
+      content_type: 'text'
+    }).select().single();
+
+    if (error) {
+        console.error('Message retry failed:', error);
+        setMessages(prev => prev.map(msg => msg.id === m.id ? { ...msg, _status: 'failed' } : msg));
+    } else {
+        setMessages(prev => prev.map(msg => msg.id === m.id ? data : msg));
     }
   };
 
   const deleteMessage = async (m: any) => {
     const session = await supabase.auth.getSession();
     const token = session.data.session?.access_token;
-    
+
+    // The B2 object delete must happen BEFORE the DB row is removed: the
+    // server-side endpoint verifies the caller owns this object by looking
+    // up the messages row for the given b2_object_key, so the row has to
+    // still exist when that call is made. (Previously the DB row was
+    // deleted first and the object delete request afterwards carried no
+    // ownership check at all — see delete/[objectKey].ts.)
+    if (m.b2_object_key) {
+        const mediaDeleteRes = await fetch(`/api/media/delete/${m.b2_object_key}`, {
+            method: 'DELETE',
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (!mediaDeleteRes.ok) {
+            console.error("Media object delete failed", await mediaDeleteRes.text().catch(() => ''));
+            // Non-fatal: still proceed to delete the message row itself so
+            // the user isn't stuck unable to delete a message because
+            // storage cleanup failed; the object is just orphaned in B2.
+        }
+    }
+
     // .select() forces PostgREST to return the row(s) actually deleted.
     // Without it, a DELETE blocked by RLS (0 rows affected) still comes
     // back with error: null, which would make this look successful even
@@ -226,13 +427,7 @@ export default function ChatPage() {
         alert('Failed to delete message: you may not have permission to delete this message.');
         return;
     }
-    
-    if (m.b2_object_key) {
-        await fetch(`/api/media/delete/${m.b2_object_key}`, {
-            method: 'DELETE',
-            headers: { 'Authorization': `Bearer ${token}` }
-        });
-    }
+
     await MediaCache.deleteMedia(m.id);
     setMessages(prev => prev.filter(msg => msg.id !== m.id));
   };
@@ -272,7 +467,14 @@ export default function ChatPage() {
         <div className="w-10 h-10 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold overflow-hidden shrink-0">
              {otherUser?.profiles?.avatar_url ? <img src={otherUser.profiles.avatar_url} alt="" decoding="async" className="w-full h-full object-cover" /> : otherUser?.profiles?.display_name?.charAt(0)}
         </div>
-        <div className="flex-1 min-w-0 font-semibold text-gray-900 truncate">{otherUser?.profiles?.display_name || 'Conversation'}</div>
+        <div className="flex-1 min-w-0">
+          <div className="font-semibold text-gray-900 truncate">{otherUser?.profiles?.display_name || 'Conversation'}</div>
+          {otherUserRecording ? (
+            <div className="text-xs text-red-500">recording voice message…</div>
+          ) : otherUserTyping ? (
+            <div className="text-xs text-blue-600">typing…</div>
+          ) : null}
+        </div>
         {otherUser && (
             <div className="flex items-center gap-2 shrink-0">
                 <button onClick={handleCall} className={`p-2 hover:bg-gray-100 rounded-full ${!isUserOnline(otherUser.user_id) ? 'text-gray-400' : 'text-gray-600'}`} aria-label="Call">
@@ -283,7 +485,11 @@ export default function ChatPage() {
         )}
       </div>
       
-      <div className="flex-1 overflow-y-auto overflow-x-hidden p-3 sm:p-4 space-y-3 sm:space-y-4">
+      <div ref={messagesContainerRef} className="flex-1 overflow-y-auto overflow-x-hidden p-3 sm:p-4 space-y-3 sm:space-y-4">
+        <div ref={topSentinelRef} />
+        {loadingOlder && (
+          <div className="flex justify-center py-2"><Loader2 className="animate-spin text-gray-400" size={18} /></div>
+        )}
         {messages.map((m) => (
           <MessageBubble
             key={m.id}
@@ -299,6 +505,7 @@ export default function ChatPage() {
             onToggleSelect={() => setSelectedMessageId(selectedMessageId === m.id ? null : m.id)}
             onStartEdit={() => { setEditingMessage(m); setEditContent(m.content_body.replace(" (edited)", "")); setSelectedMessageId(null); }}
             onRequestDelete={() => { setMessageToDelete(m); setSelectedMessageId(null); }}
+            onRetry={() => retrySendMessage(m)}
           />
         ))}
         <div ref={scrollRef} />
@@ -324,7 +531,7 @@ export default function ChatPage() {
       
       <form onSubmit={sendMessage} className="pb-safe p-2 sm:p-4 bg-white border-t flex gap-1 sm:gap-2 w-full items-center">
         <>
-        <VoiceRecorder onSent={() => {}} onAudioPreview={(isPreview) => setIsPreviewMode(isPreview)} />
+        <VoiceRecorder onSent={() => {}} onAudioPreview={(isPreview) => setIsPreviewMode(isPreview)} recipientId={otherUser?.user_id} onRecordingStateChange={handleRecordingStateChange} />
         <button type="button" onClick={() => fileInputRef.current?.click()} className="p-3 hover:bg-gray-100 rounded-full shrink-0 text-gray-500" aria-label="Attach image">
             <ImageIcon size={20} />
         </button>
@@ -333,7 +540,7 @@ export default function ChatPage() {
           <>
             <input 
               value={newMessage}
-              onChange={(e) => setNewMessage(e.target.value)}
+              onChange={(e) => handleMessageInputChange(e.target.value)}
               className="flex-1 p-3 px-4 bg-gray-100 border-none rounded-full outline-none focus:ring-2 focus:ring-blue-500 min-w-0"
               placeholder="Message..."
             />

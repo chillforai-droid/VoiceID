@@ -15,6 +15,7 @@ interface MessageBubbleProps {
   onToggleSelect: () => void;
   onStartEdit: () => void;
   onRequestDelete: () => void;
+  onRetry?: () => void;
 }
 
 // Same markup/behavior as the previous inline JSX in ChatPage — extracted
@@ -33,6 +34,7 @@ function MessageBubbleImpl({
   onToggleSelect,
   onStartEdit,
   onRequestDelete,
+  onRetry,
 }: MessageBubbleProps) {
   return (
     <div
@@ -58,13 +60,22 @@ function MessageBubbleImpl({
         ) : (
           <>
             {m.content_type === 'voice' ? <VoiceMessage message={m} /> : (m.content_type === 'image' ? <ImageMessage message={m} /> : <span className="whitespace-pre-wrap [overflow-wrap:anywhere]">{m.content_body}</span>)}
-            <p className={`text-[10px] mt-1 ${isOwn ? 'text-blue-100' : 'text-gray-400'}`}>
+            <p className={`text-[10px] mt-1 flex items-center gap-1.5 ${isOwn ? 'text-blue-100' : 'text-gray-400'}`}>
               {new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+              {isOwn && m._status === 'sending' && <span className="italic">Sending…</span>}
+              {isOwn && m._status === 'failed' && (
+                <button
+                  onClick={e => { e.stopPropagation(); onRetry?.(); }}
+                  className="underline decoration-dotted text-red-200 hover:text-white font-medium"
+                >
+                  Failed — tap to retry
+                </button>
+              )}
             </p>
           </>
         )}
       </div>
-      {isOwn && !isEditing && isSelected && (
+      {isOwn && !isEditing && isSelected && !m._status && (
         <div className="flex items-center gap-4 mt-1 px-1" onClick={e => e.stopPropagation()}>
           {m.content_type === 'text' && (
             <button onClick={e => { e.stopPropagation(); onStartEdit(); }} className="text-xs text-blue-600 font-medium hover:text-blue-800 py-1">Edit</button>
