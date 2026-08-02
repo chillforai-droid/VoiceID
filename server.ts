@@ -6,26 +6,12 @@ import uploadAuthHandler from "./api/upload-auth";
 import downloadAuthHandler from "./api/download-auth";
 import ackHandler from "./api/ack";
 import deleteHandler from "./api/delete/[objectKey]";
-import cloudinarySignHandler from "./api/cloudinary-sign";
 
 async function startServer() {
   const app = express();
   const PORT = 3000;
 
   app.use(express.json());
-
-  // Mirror the security headers set in vercel.json's `headers` block so the
-  // Express (dev/Docker) deployment path isn't missing them.
-  app.use((req, res, next) => {
-    res.setHeader(
-      "Content-Security-Policy",
-      "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; media-src 'self' blob: https:; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.cloudinary.com https:; font-src 'self' data:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
-    );
-    res.setHeader("X-Content-Type-Options", "nosniff");
-    res.setHeader("X-Frame-Options", "DENY");
-    res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
-    next();
-  });
 
   app.post("/api/media/upload", express.raw({ type: '*/*', limit: '10mb' }), (req, res) => uploadHandler(req as any, res as any));
   app.post("/api/media/upload-auth", (req, res) => uploadAuthHandler(req as any, res as any));
@@ -35,7 +21,6 @@ async function startServer() {
     (req as any).query = { ...req.query, objectKey: req.params.objectKey };
     deleteHandler(req as any, res as any);
   });
-  app.post("/api/cloudinary-sign", (req, res) => cloudinarySignHandler(req as any, res as any));
 
   // Vite middleware
   if (process.env.NODE_ENV !== "production") {

@@ -24,31 +24,8 @@ const VoiceCallContext = createContext<VoiceCallContextType>({} as VoiceCallCont
 
 // Static across the app's lifetime — hoisted out of the component so it
 // isn't reallocated on every VoiceCallProvider render.
-//
-// Previously STUN-only, hardcoded, with no TURN fallback — calls between
-// two peers where at least one is behind a symmetric NAT (common on
-// mobile carrier networks) cannot establish a direct P2P connection and
-// will silently fail to connect. This adds an optional TURN server via
-// env vars; if none are configured, behavior is unchanged (STUN only).
-// Configure via VITE_TURN_URLS (comma-separated for multiple), plus
-// VITE_TURN_USERNAME / VITE_TURN_CREDENTIAL if the TURN server requires
-// auth (most hosted TURN providers do).
-const TURN_URLS = (import.meta.env.VITE_TURN_URLS || '')
-  .split(',')
-  .map((u: string) => u.trim())
-  .filter(Boolean);
-
-const ICE_SERVERS: RTCConfiguration = {
-  iceServers: [
-    { urls: 'stun:stun.l.google.com:19302' },
-    ...(TURN_URLS.length > 0
-      ? [{
-          urls: TURN_URLS,
-          username: import.meta.env.VITE_TURN_USERNAME,
-          credential: import.meta.env.VITE_TURN_CREDENTIAL,
-        }]
-      : []),
-  ],
+const ICE_SERVERS = {
+  iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
 };
 
 export const VoiceCallProvider = ({ children }: { children: React.ReactNode }) => {
@@ -172,22 +149,6 @@ export const VoiceCallProvider = ({ children }: { children: React.ReactNode }) =
         .maybeSingle();
 
       if (!contact) return { canCall: false, reason: 'Must be friends to call' };
-
-      // user_settings.calls was previously stored but never checked. Since
-      // calling is already contacts-only (the check above), 'everyone' vs
-      // 'contacts' has no observable difference here — the only case that
-      // actually changes behavior is 'nobody', which should block even a
-      // contact. (Honoring 'everyone' would mean allowing calls from
-      // non-contacts too, which would loosen the friends-only gate above —
-      // that's a business-logic change, not a bug fix, so it's intentionally
-      // left alone here.)
-      const { data: canCall, error: rpcError } = await supabase.rpc('can_user_receive', {
-          p_owner_id: targetUserId,
-          p_kind: 'call'
-      });
-      if (!rpcError && canCall === false) {
-          return { canCall: false, reason: 'This user is not accepting calls right now' };
-      }
 
       return { canCall: true };
   }, [user, isUserOnline]);

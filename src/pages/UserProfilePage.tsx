@@ -123,24 +123,6 @@ export default function UserProfilePage() {
     let error;
     let rowsAffected: any[] | null = null;
     if (action === 'add') {
-        // user_settings.contact_requests was previously stored but never
-        // checked anywhere — anyone could request anyone regardless of
-        // their preference. This RPC answers the yes/no question without
-        // exposing the target's full settings row (RLS only lets a user
-        // read their own settings).
-        const { data: canRequest, error: rpcError } = await supabase.rpc('can_user_receive', {
-            p_owner_id: resolvedProfileId,
-            p_kind: 'contact_request'
-        });
-        if (rpcError) {
-            console.error('Privacy check failed', rpcError);
-            alert('Could not send contact request right now. Please try again.');
-            return;
-        }
-        if (!canRequest) {
-            alert('This user is not accepting contact requests right now.');
-            return;
-        }
         const { error: err } = await supabase.from('contacts').insert({ requester_id: user?.id, responder_id: resolvedProfileId, status: 'pending' });
         error = err;
     } else if (action === 'remove' || action === 'reject') {

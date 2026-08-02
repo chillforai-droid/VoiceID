@@ -5,7 +5,7 @@ import { useParams } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { MediaCache } from '../../lib/MediaCache';
 
-export function VoiceRecorder({ onSent, onAudioPreview, recipientId, onRecordingStateChange }: { onSent: () => void, onAudioPreview?: (isPreview: boolean) => void, recipientId?: string, onRecordingStateChange?: (isRecording: boolean) => void }) {
+export function VoiceRecorder({ onSent, onAudioPreview }: { onSent: () => void, onAudioPreview?: (isPreview: boolean) => void }) {
   const { id } = useParams();
   const { user } = useAuth();
   const [isRecording, setIsRecording] = useState(false);
@@ -27,10 +27,6 @@ export function VoiceRecorder({ onSent, onAudioPreview, recipientId, onRecording
       onAudioPreview(!!audioBlob);
     }
   }, [audioBlob, onAudioPreview]);
-
-  useEffect(() => {
-    onRecordingStateChange?.(isRecording);
-  }, [isRecording, onRecordingStateChange]);
 
   useEffect(() => {
     return () => {
@@ -132,22 +128,6 @@ export function VoiceRecorder({ onSent, onAudioPreview, recipientId, onRecording
     }
 
     setError(null);
-
-    // user_settings.voice_messages was previously stored but never checked.
-    // Voice messages can only be sent within an existing conversation,
-    // which today only exists between accepted contacts, so 'everyone' vs
-    // 'contacts' has no observable effect here — the only case this can
-    // actually change is 'nobody'.
-    if (recipientId) {
-      const { data: canSend, error: rpcError } = await supabase.rpc('can_user_receive', {
-        p_owner_id: recipientId,
-        p_kind: 'voice_message'
-      });
-      if (!rpcError && canSend === false) {
-        setError('This user is not accepting voice messages right now.');
-        return;
-      }
-    }
 
     // 1. Calculate Hash
     let sha256: string;
