@@ -8,7 +8,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
     const user = await verifyAuth(req);
-    if (!user) return res.status(401).json({ error: "Unauthorized" });
+    if (!user) {
+        console.log("[MediaAuth] returning VoiceID 401"); // TEMPORARY DIAGNOSTIC
+        return res.status(401).json({ error: "Unauthorized" });
+    }
 
     const { messageId } = req.body;
     const { data: message } = await supabaseAdmin.from("messages").select("*").eq("id", messageId).single();

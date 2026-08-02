@@ -7,7 +7,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (req.method !== 'DELETE') return res.status(405).json({ error: 'Method not allowed' });
     
     const user = await verifyAuth(req);
-    if (!user) return res.status(401).json({ error: "Unauthorized" });
+    if (!user) {
+        console.log("[MediaAuth] returning VoiceID 401"); // TEMPORARY DIAGNOSTIC
+        return res.status(401).json({ error: "Unauthorized" });
+    }
     
     const objectKey = req.query.objectKey as string;
     if (!objectKey) return res.status(400).json({ error: "Missing objectKey" });
