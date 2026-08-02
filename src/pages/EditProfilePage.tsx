@@ -40,18 +40,9 @@ export default function EditProfilePage() {
         const folder = 'voiceid/avatars';
         const public_id = user?.id;
 
-        // /api/cloudinary-sign now requires auth (it previously accepted any
-        // caller and trusted a client-supplied public_id, which allowed
-        // overwriting another user's avatar) — send the session token.
-        const { data: sessionData } = await supabase.auth.getSession();
-        const token = sessionData.session?.access_token;
-
         const response = await fetch('/api/cloudinary-sign', {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                ...(token ? { 'Authorization': `Bearer ${token}` } : {})
-            },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ timestamp, folder, public_id })
         });
 

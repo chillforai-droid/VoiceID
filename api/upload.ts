@@ -11,10 +11,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     try {
         stage = "authentication";
         const user = await verifyAuth(req);
-        if (!user) {
-            console.log("[MediaAuth] returning VoiceID 401"); // TEMPORARY DIAGNOSTIC
-            return res.status(401).json({ error: "Unauthorized" });
-        }
+        if (!user) return res.status(401).json({ error: "Unauthorized" });
 
         stage = "s3_client_setup";
         const s3Client = getS3Client();
