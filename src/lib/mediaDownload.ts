@@ -24,7 +24,11 @@ export async function fetchAndCacheMedia(message: any, mediaType: 'image' | 'voi
   const session = await supabase.auth.getSession();
   const token = session.data.session?.access_token;
 
-  const res = await fetch('/api/media/download-auth', {
+  // Browser-safe same-origin download. The native app can keep using
+  // /api/media/download-auth + the B2 presigned URL. Fetching B2 directly from
+  // the browser is fragile when the site's origin is voiceid.online but B2 CORS
+  // is configured for www.voiceid.online (or vice versa).
+  const blobRes = await fetch('/api/media/download', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -33,18 +37,10 @@ export async function fetchAndCacheMedia(message: any, mediaType: 'image' | 'voi
     body: JSON.stringify({ messageId: message.id }),
   });
 
-  if (!res.ok) {
-    throw new Error(`Download authorization failed (${res.status})`);
-  }
-
-  const { url: downloadUrl } = await res.json();
-  if (!downloadUrl) {
-    throw new Error('Invalid download URL');
-  }
-
-  const blobRes = await fetch(downloadUrl);
   if (!blobRes.ok) {
-    throw new Error(`Failed to fetch media (${blobRes.status})`);
+    let detail = '';
+    try { detail = await blobRes.text(); } catch {}
+    throw new Error(`Failed to fetch media (${blobRes.status})${detail ? `: ${detail}` : ''}`);
   }
   const blob = await blobRes.blob();
 

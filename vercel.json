@@ -13,6 +13,10 @@
       "destination": "/api/download-auth"
     },
     {
+      "source": "/api/media/download",
+      "destination": "/api/download"
+    },
+    {
       "source": "/api/media/ack",
       "destination": "/api/ack"
     },
