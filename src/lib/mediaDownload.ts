@@ -1,5 +1,6 @@
 import { supabase } from './supabase';
 import { MediaCache } from './MediaCache';
+import { calculateSHA256 } from './crypto';
 
 /**
  * Shared B2 download flow used by both ImageMessage and VoiceMessage.
@@ -46,6 +47,19 @@ export async function fetchAndCacheMedia(message: any, mediaType: 'image' | 'voi
     throw new Error(`Failed to fetch media (${blobRes.status})`);
   }
   const blob = await blobRes.blob();
+
+  // Never ACK/delete the ephemeral B2 object until the exact bytes have been
+  // verified. This protects the receiver from caching a truncated/corrupt
+  // mobile upload and then deleting the only remote copy.
+  if (message.byte_size && blob.size !== Number(message.byte_size)) {
+    throw new Error(`Media size mismatch: expected ${message.byte_size}, got ${blob.size}`);
+  }
+  if (message.sha256) {
+    const actualHash = await calculateSHA256(blob);
+    if (actualHash !== message.sha256) {
+      throw new Error('Media integrity check failed (SHA-256 mismatch)');
+    }
+  }
 
   await MediaCache.putMedia({
     messageId: message.id,
