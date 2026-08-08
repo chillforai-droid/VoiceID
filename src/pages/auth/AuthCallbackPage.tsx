@@ -20,6 +20,8 @@ export default function AuthCallbackPage() {
       }
       
 
+      const sharedRef = typeof window !== 'undefined' ? window.localStorage.getItem('voiceid_shared_profile_ref') : null;
+
       // Check profile
       const { data: profile, error: profileError } = await supabase
         .from('profiles')
@@ -29,10 +31,10 @@ export default function AuthCallbackPage() {
 
 
       if (profileError || !profile || !profile.username) {
-        navigate('/auth/choose-id', { replace: true });
+        navigate(sharedRef ? `/auth/choose-id?ref=${encodeURIComponent(sharedRef)}` : '/auth/choose-id', { replace: true });
       } else {
         await updateProfile();
-        navigate('/dashboard', { replace: true });
+        navigate(sharedRef ? `/u/${encodeURIComponent(sharedRef)}` : '/dashboard', { replace: true });
       }
     };
 

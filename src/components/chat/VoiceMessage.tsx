@@ -1,9 +1,9 @@
 import { memo, useState, useRef, useEffect } from 'react';
-import { Play, Loader2, Pause } from 'lucide-react';
+import { Play, Loader2, Pause, Download } from 'lucide-react';
 import { VoiceAudioCache } from '../../lib/VoiceAudioCache';
 import { MediaCache } from '../../lib/MediaCache';
 import { supabase } from '../../lib/supabase';
-import { fetchAndCacheMedia } from '../../lib/mediaDownload';
+import { downloadMedia, fetchAndCacheMedia } from '../../lib/mediaDownload';
 
 function VoiceMessageImpl({ message }: { message: any }) {
   const [isPlaying, setIsPlaying] = useState(false);
@@ -20,6 +20,19 @@ function VoiceMessageImpl({ message }: { message: any }) {
       if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current);
     };
   }, []);
+
+  const downloadAudio = async () => {
+    try {
+      setError(null);
+      setIsDownloading(true);
+      await downloadMedia(message, 'voice');
+    } catch (err) {
+      console.error('VoiceMessage: download failed', err);
+      setError('Failed to download voice message.');
+    } finally {
+      setIsDownloading(false);
+    }
+  };
 
   const playAudio = async () => {
     if (isPlaying) {
@@ -62,18 +75,6 @@ function VoiceMessageImpl({ message }: { message: any }) {
       audio.onended = () => setIsPlaying(false);
       await audio.play();
       setIsPlaying(true);
-      // Durable message read receipt. The legacy played RPC remains for
-      // voice-message expiry/cleanup semantics.
-      try {
-        await supabase.rpc('mark_message_read', { p_message_id: message.id });
-      } catch (err) {
-        console.warn('Failed to mark voice message read', err);
-      }
-      try {
-        await supabase.rpc('acknowledge_voice_played', { p_message_id: message.id });
-      } catch (_) {
-        // Legacy RPC may be unavailable for newer message rows; do not block playback.
-      }
     } catch (err) {
       console.error('VoiceMessage: failed to play audio', err);
       setError('Failed to load voice message.');
@@ -84,10 +85,15 @@ function VoiceMessageImpl({ message }: { message: any }) {
 
   return (
     <div className="flex flex-col gap-1">
-      <button onClick={playAudio} className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/50 text-gray-900 text-sm font-medium hover:bg-white transition">
-        {isDownloading ? <Loader2 className="animate-spin" size={16} /> : isPlaying ? <Pause size={16} /> : <Play size={16} />}
-        <span>{message.duration || 0}s</span>
-      </button>
+      <div className="flex items-center gap-2">
+        <button onClick={playAudio} className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/50 dark:bg-slate-800/70 text-gray-900 dark:text-white text-sm font-medium hover:bg-white dark:hover:bg-slate-700 transition">
+          {isDownloading ? <Loader2 className="animate-spin" size={16} /> : isPlaying ? <Pause size={16} /> : <Play size={16} />}
+          <span>{message.duration || 0}s</span>
+        </button>
+        <button type="button" onClick={downloadAudio} disabled={isDownloading} aria-label="Download voice message" className="w-8 h-8 rounded-full bg-gray-100 dark:bg-slate-800 text-gray-700 dark:text-gray-200 flex items-center justify-center disabled:opacity-50">
+          <Download size={15} />
+        </button>
+      </div>
       {error && <p className="text-red-500 text-xs">{error}</p>}
     </div>
   );

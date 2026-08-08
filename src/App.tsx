@@ -6,6 +6,7 @@ import { PresenceProvider } from './context/PresenceContext';
 import { NotificationProvider } from './context/NotificationContext';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 import PageLoader from './components/common/PageLoader';
+import { ThemeProvider } from './context/ThemeContext';
 
 // Every route is code-split into its own chunk. This is purely a loading
 // strategy change: component behavior, props, and logic are untouched.
@@ -55,6 +56,7 @@ const SettingsPage = lazy(() => import('./pages/SettingsPage'));
 
 export default function App() {
   return (
+    <ThemeProvider>
     <AuthProvider>
       <PresenceProvider>
         <VoiceCallProvider>
@@ -108,5 +110,6 @@ export default function App() {
         </VoiceCallProvider>
       </PresenceProvider>
     </AuthProvider>
+    </ThemeProvider>
   );
 }

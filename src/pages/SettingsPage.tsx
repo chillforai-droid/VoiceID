@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
-import { Loader2, Save, User, Bell, Shield, LogOut, Trash2, Ban } from 'lucide-react';
+import { Loader2, Save, User, Bell, Shield, LogOut, Trash2, Ban, Sun, Moon, Monitor } from 'lucide-react';
 import { Avatar } from '../components/common/Avatar';
+import { useTheme } from '../context/ThemeContext';
 
 export default function SettingsPage() {
   const { user, profile, updateProfile } = useAuth();
+  const { theme, setTheme } = useTheme();
   const [displayName, setDisplayName] = useState(profile?.display_name || '');
   const [bio, setBio] = useState(profile?.bio || '');
   const [password, setPassword] = useState('');
@@ -90,6 +92,16 @@ export default function SettingsPage() {
     <div className="max-w-xl mx-auto space-y-6 sm:space-y-8 p-4">
       <h1 className="text-2xl font-bold">Settings</h1>
       
+      {/* Appearance */}
+      <div className="p-4 sm:p-6 bg-white border border-gray-100 rounded-2xl space-y-4">
+        <h2 className="text-lg font-semibold flex items-center gap-2"><Sun size={18}/> Appearance</h2>
+        <div className="grid grid-cols-3 gap-2">
+          <button type="button" onClick={() => setTheme('system')} className={`p-3 rounded-xl border flex flex-col items-center gap-1 text-sm ${theme === 'system' ? 'border-blue-500 bg-blue-50 dark:bg-blue-950/40' : 'border-gray-200 dark:border-slate-700'}`}><Monitor size={18}/>System</button>
+          <button type="button" onClick={() => setTheme('light')} className={`p-3 rounded-xl border flex flex-col items-center gap-1 text-sm ${theme === 'light' ? 'border-blue-500 bg-blue-50 dark:bg-blue-950/40' : 'border-gray-200 dark:border-slate-700'}`}><Sun size={18}/>Light</button>
+          <button type="button" onClick={() => setTheme('dark')} className={`p-3 rounded-xl border flex flex-col items-center gap-1 text-sm ${theme === 'dark' ? 'border-blue-500 bg-blue-50 dark:bg-blue-950/40' : 'border-gray-200 dark:border-slate-700'}`}><Moon size={18}/>Dark</button>
+        </div>
+      </div>
+
       {/* Profile Section */}
       <div className="space-y-4 p-4 sm:p-6 bg-white border border-gray-100 rounded-2xl">
         <h2 className="text-lg font-semibold flex items-center gap-2"><User size={18}/> Profile</h2>

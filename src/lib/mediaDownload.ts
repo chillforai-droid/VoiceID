@@ -98,3 +98,21 @@ export async function fetchAndCacheMedia(message: any, mediaType: 'image' | 'voi
 
   return blob;
 }
+
+
+/** Download an already-authorized media blob using the existing media flow. */
+export async function downloadMedia(message: any, mediaType: 'image' | 'voice') {
+  const blob = await fetchAndCacheMedia(message, mediaType);
+  const mime = (message.mime_type || blob.type || '').split(';')[0];
+  const ext = mime.split('/')[1] || (mediaType === 'voice' ? 'webm' : 'bin');
+  const safeName = `voiceid-${message.id}.${ext.replace(/[^a-z0-9]/gi, '') || 'bin'}`;
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = safeName;
+  anchor.rel = 'noopener';
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+}

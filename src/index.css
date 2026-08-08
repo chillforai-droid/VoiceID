@@ -35,3 +35,38 @@ body {
   height: var(--sab);
 }
 
+
+/* VoiceID global light/dark surface tokens. Existing Tailwind utility classes
+   remain compatible; these scoped overrides ensure every route follows the
+   selected theme without requiring a page-by-page rewrite. */
+html[data-theme="dark"] body {
+  color: #f8fafc;
+  background-color: #020617;
+  background-image: none;
+}
+html[data-theme="light"] body {
+  color: #111827;
+  background-color: #ffffff;
+}
+html[data-theme="dark"] .bg-white { background-color: #0f172a !important; }
+html[data-theme="dark"] .bg-gray-50 { background-color: #111827 !important; }
+html[data-theme="dark"] .bg-gray-100 { background-color: #1e293b !important; }
+html[data-theme="dark"] .bg-gray-200 { background-color: #334155 !important; }
+html[data-theme="dark"] .text-gray-900,
+html[data-theme="dark"] .text-gray-800,
+html[data-theme="dark"] .text-gray-700 { color: #f8fafc !important; }
+html[data-theme="dark"] .text-gray-600 { color: #cbd5e1 !important; }
+html[data-theme="dark"] .text-gray-500,
+html[data-theme="dark"] .text-gray-400 { color: #94a3b8 !important; }
+html[data-theme="dark"] .border-gray-100,
+html[data-theme="dark"] .border-gray-200 { border-color: #334155 !important; }
+html[data-theme="dark"] input,
+html[data-theme="dark"] textarea,
+html[data-theme="dark"] select {
+  background-color: #0f172a;
+  color: #f8fafc;
+  border-color: #334155;
+}
+html[data-theme="dark"] input::placeholder,
+html[data-theme="dark"] textarea::placeholder { color: #64748b; }
+html[data-theme="dark"] .hover\\:bg-gray-50:hover { background-color: #1e293b !important; }

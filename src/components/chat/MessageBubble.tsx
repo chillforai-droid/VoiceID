@@ -1,7 +1,7 @@
 import { memo } from 'react';
 import { VoiceMessage } from './VoiceMessage';
 import { ImageMessage } from './ImageMessage';
-import { Check, CheckCheck, Clock, AlertCircle } from 'lucide-react';
+import { Clock3, Check } from 'lucide-react';
 
 interface MessageBubbleProps {
   message: any;
@@ -59,17 +59,11 @@ function MessageBubbleImpl({
         ) : (
           <>
             {m.content_type === 'voice' ? <VoiceMessage message={m} /> : (m.content_type === 'image' ? <ImageMessage message={m} /> : <span className="whitespace-pre-wrap [overflow-wrap:anywhere]">{m.content_body}</span>)}
-            <div className={`text-[10px] mt-1 flex items-center justify-end gap-1 ${isOwn ? 'text-blue-100' : 'text-gray-400'}`}>
-              <span>{new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-              {isOwn && (() => {
-                const status = m.delivery_status || 'sent';
-                if (status === 'read') return <CheckCheck size={14} strokeWidth={2.5} className="text-sky-200" aria-label="Read" />;
-                if (status === 'delivered') return <CheckCheck size={14} strokeWidth={2.5} aria-label="Delivered" />;
-                if (status === 'sending') return <Clock size={12} aria-label="Sending" className="animate-pulse" />;
-                if (status === 'failed') return <AlertCircle size={13} className="text-red-200" aria-label="Failed" />;
-                return <Check size={14} strokeWidth={2.5} aria-label="Sent" />;
-              })()}
-            </div>
+            <p className={`text-[10px] mt-1 ${isOwn ? 'text-blue-100' : 'text-gray-400'}`}>
+              {new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+              {isOwn && m.local_pending && <span className="ml-1 inline-flex items-center gap-0.5"><Clock3 size={10} /> sending</span>}
+              {isOwn && !m.local_pending && <span className="ml-1 inline-flex items-center"><Check size={11} /></span>}
+            </p>
           </>
         )}
       </div>

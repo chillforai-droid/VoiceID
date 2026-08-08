@@ -1,11 +1,13 @@
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { supabase } from '../../lib/supabase';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 
 export default function Login() {
   const { register, handleSubmit } = useForm();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const ref = searchParams.get('ref') || (typeof window !== 'undefined' ? window.localStorage.getItem('voiceid_shared_profile_ref') : null);
   const [error, setError] = useState<string | null>(null);
 
   const signInWithGoogle = async () => {
@@ -25,7 +27,7 @@ export default function Login() {
         setError(signInError.message);
         return;
     }
-    navigate('/dashboard');
+    navigate(ref ? `/u/${encodeURIComponent(ref)}` : '/dashboard');
   };
 
   return (

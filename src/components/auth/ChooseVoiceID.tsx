@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { supabase } from '../../lib/supabase';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { CheckCircle2 } from 'lucide-react';
 
@@ -11,6 +11,8 @@ export default function ChooseVoiceID() {
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const ref = searchParams.get('ref') || (typeof window !== 'undefined' ? window.localStorage.getItem('voiceid_shared_profile_ref') : null);
   const { user, updateProfile } = useAuth();
 
   const checkAvailability = async (val: string) => {
@@ -45,7 +47,7 @@ export default function ChooseVoiceID() {
 
     setSubmitting(false);
     setSuccess(true);
-    setTimeout(() => navigate('/dashboard'), 900);
+    setTimeout(() => navigate(ref ? `/u/${encodeURIComponent(ref)}` : '/dashboard'), 900);
   };
 
   if (success) {

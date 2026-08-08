@@ -3,13 +3,15 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { signUpSchema, SignUpForm } from '../../lib/validation';
 import { supabase } from '../../lib/supabase';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 
 export default function SignUp() {
   const { register, handleSubmit, formState: { errors } } = useForm<SignUpForm>({
     resolver: zodResolver(signUpSchema),
   });
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const ref = searchParams.get('ref') || (typeof window !== 'undefined' ? window.localStorage.getItem('voiceid_shared_profile_ref') : null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -41,7 +43,7 @@ export default function SignUp() {
         }
         return;
     }
-    navigate('/auth/choose-id');
+    navigate(ref ? `/auth/choose-id?ref=${encodeURIComponent(ref)}` : '/auth/choose-id');
   };
 
   return (

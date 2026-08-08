@@ -147,27 +147,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
         })
       .subscribe();
 
-    const messageChannel = supabase
-      .channel(`realtime:message-receipts:${user.id}`)
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, async (payload) => {
-        const msg: any = payload.new;
-        if (!msg || msg.sender_id === user.id) return;
-        const { data: membership } = await supabase
-          .from('conversation_members')
-          .select('user_id')
-          .eq('conversation_id', msg.conversation_id)
-          .eq('user_id', user.id)
-          .maybeSingle();
-        if (!membership) return;
-        const isActive = activeConversationIdRef.current === msg.conversation_id;
-        await supabase.rpc(isActive ? 'mark_message_read' : 'mark_message_delivered', { p_message_id: msg.id });
-      })
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-      supabase.removeChannel(messageChannel);
-    };
+    return () => { supabase.removeChannel(channel); };
   }, [user, fetchNotifications, recomputeCounts]);
 
   const markAsRead = useCallback(async (id: string) => {
