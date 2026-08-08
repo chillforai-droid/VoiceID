@@ -23,7 +23,7 @@ export default function LandingPage() {
   });
 
   return (
-    <div className="min-h-screen bg-white text-black font-sans">
+    <div className="min-h-screen bg-white dark:bg-slate-950 text-black dark:text-white font-sans transition-colors">
       <Navbar />
       <Hero />
       <Story />

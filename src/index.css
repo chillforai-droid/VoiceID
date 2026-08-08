@@ -70,3 +70,19 @@ html[data-theme="dark"] select {
 html[data-theme="dark"] input::placeholder,
 html[data-theme="dark"] textarea::placeholder { color: #64748b; }
 html[data-theme="dark"] .hover\\:bg-gray-50:hover { background-color: #1e293b !important; }
+
+/* Marketing/landing pages use a few intentionally hard-coded Tailwind light
+   utilities. Keep them theme-aware so the global theme also applies before and
+   after authentication. */
+html[data-theme="dark"] .text-black { color: #f8fafc !important; }
+html[data-theme="dark"] .hover\:text-black:hover { color: #ffffff !important; }
+html[data-theme="dark"] .hover\:bg-white:hover { background-color: #1e293b !important; }
+html[data-theme="dark"] .border-white { border-color: #334155 !important; }
+html[data-theme="dark"] .bg-white\/80 { background-color: rgb(2 6 23 / 0.85) !important; }
+html[data-theme="dark"] .bg-white\/90 { background-color: rgb(2 6 23 / 0.92) !important; }
+html[data-theme="dark"] .bg-gray-50 { background-color: #111827 !important; }
+html[data-theme="dark"] .bg-gray-100 { background-color: #1e293b !important; }
+html[data-theme="dark"] .text-gray-700 { color: #e2e8f0 !important; }
+html[data-theme="dark"] .text-gray-600 { color: #cbd5e1 !important; }
+html[data-theme="dark"] .text-gray-500 { color: #94a3b8 !important; }
+html[data-theme="dark"] .border-gray-100 { border-color: #334155 !important; }

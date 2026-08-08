@@ -30,7 +30,7 @@ export default function HelpPage() {
   });
 
   return (
-    <div className="min-h-screen flex flex-col bg-white text-black">
+    <div className="min-h-screen flex flex-col bg-white dark:bg-slate-950 text-black dark:text-white transition-colors">
       <Navbar />
       <Breadcrumbs items={[{ label: 'Help', path: '/help' }]} />
       <section className="pt-10 sm:pt-14 pb-12 px-4 sm:px-6 text-center max-w-3xl mx-auto">

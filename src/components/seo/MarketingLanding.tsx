@@ -73,7 +73,7 @@ export default function MarketingLanding({
   });
 
   return (
-    <div className="min-h-screen flex flex-col bg-white text-black">
+    <div className="min-h-screen flex flex-col bg-white dark:bg-slate-950 text-black dark:text-white transition-colors">
       <Navbar />
       <Breadcrumbs items={crumbs} />
 
@@ -109,7 +109,7 @@ export default function MarketingLanding({
         <ol className="space-y-8">
           {howItWorks.map((step, i) => (
             <li key={i} className="flex gap-5">
-              <span className="shrink-0 w-9 h-9 rounded-full bg-black text-white flex items-center justify-center font-bold text-sm" aria-hidden="true">{i + 1}</span>
+              <span className="shrink-0 w-9 h-9 rounded-full bg-black dark:bg-white text-white dark:text-black flex items-center justify-center font-bold text-sm" aria-hidden="true">{i + 1}</span>
               <div>
                 <h3 className="font-bold text-lg mb-1">{step.title}</h3>
                 <p className="text-gray-600 text-sm leading-relaxed">{step.description}</p>

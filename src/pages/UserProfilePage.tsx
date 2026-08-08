@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import { Phone, Mic, UserPlus, Loader2, UserCheck, UserX, Ban, Share, Copy, Check, LogIn, UserRoundPlus, Link2 } from 'lucide-react';
+import { Phone, MessageCircle, UserPlus, Loader2, UserCheck, UserX, Ban, Share, Copy, Check, LogIn, UserRoundPlus, Link2 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useVoiceCall } from '../hooks/useVoiceCall';
 import { usePresence } from '../context/PresenceContext';
@@ -322,11 +322,11 @@ export default function UserProfilePage() {
                 )}
 
                 <div className="flex flex-wrap gap-3 justify-center mt-5">
-                  <button onClick={handleCall} disabled={!isOnline || contactRelation.status !== 'accepted'} aria-label="Call" className={`p-4 rounded-2xl transition ${!isOnline || contactRelation.status !== 'accepted' ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-blue-50 text-blue-600 hover:bg-blue-100'}`}><Phone size={22} /></button>
-                  <button onClick={handleMessageAction} aria-label="Message" className="p-4 bg-purple-50 text-purple-600 rounded-2xl hover:bg-purple-100 transition"><Mic size={22} /></button>
-                  <button onClick={handleShare} aria-label="Share profile" className="p-4 bg-gray-100 text-gray-600 rounded-2xl hover:bg-gray-200 transition"><Share size={22} /></button>
-                  {contactRelation.status === 'accepted' && <button onClick={() => handleContactAction('remove')} aria-label="Remove contact" className="p-4 bg-red-50 text-red-600 rounded-2xl hover:bg-red-100 transition"><UserX size={22} /></button>}
-                  {contactRelation.status !== 'blocked' ? <button onClick={() => handleContactAction('block')} aria-label="Block user" className="p-4 bg-red-50 text-red-600 rounded-2xl hover:bg-red-100 transition"><Ban size={22} /></button> : <button onClick={() => handleContactAction('unblock')} aria-label="Unblock user" className="p-4 bg-green-50 text-green-600 rounded-2xl hover:bg-green-100 transition"><UserPlus size={22} /></button>}
+                  <button onClick={handleCall} disabled={!isOnline || contactRelation.status !== 'accepted'} aria-label="Call" title="Call" className={`min-w-[92px] px-4 py-3 rounded-2xl transition flex items-center justify-center gap-2 font-semibold ${!isOnline || contactRelation.status !== 'accepted' ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-blue-50 text-blue-600 hover:bg-blue-100'}`}><Phone size={20} /><span>Call</span></button>
+                  <button onClick={handleMessageAction} aria-label="Message" title="Message" className="min-w-[108px] px-4 py-3 bg-purple-50 text-purple-600 rounded-2xl hover:bg-purple-100 transition flex items-center justify-center gap-2 font-semibold"><MessageCircle size={20} /><span>Message</span></button>
+                  <button onClick={handleShare} aria-label="Share profile" title="Share profile" className="min-w-[92px] px-4 py-3 bg-gray-100 text-gray-600 rounded-2xl hover:bg-gray-200 transition flex items-center justify-center gap-2 font-semibold"><Share size={20} /><span>Share</span></button>
+                  {contactRelation.status === 'accepted' && <button onClick={() => handleContactAction('remove')} aria-label="Remove contact" title="Remove contact" className="p-3 bg-red-50 text-red-600 rounded-2xl hover:bg-red-100 transition"><UserX size={20} /></button>}
+                  {contactRelation.status !== 'blocked' ? <button onClick={() => handleContactAction('block')} aria-label="Block user" title="Block user" className="p-3 bg-red-50 text-red-600 rounded-2xl hover:bg-red-100 transition"><Ban size={20} /></button> : <button onClick={() => handleContactAction('unblock')} aria-label="Unblock user" title="Unblock user" className="p-3 bg-green-50 text-green-600 rounded-2xl hover:bg-green-100 transition"><UserPlus size={20} /></button>}
                 </div>
               </>
             )}
