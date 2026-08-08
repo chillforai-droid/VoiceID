@@ -29,8 +29,66 @@ export default function ChatPage() {
   const [isPreviewMode, setIsPreviewMode] = useState(false);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
   const [otherUser, setOtherUser] = useState<any>(null);
+  const [isOnline, setIsOnline] = useState(() => navigator.onLine);
+  const [typingUsers, setTypingUsers] = useState<Record<string, boolean>>({});
+  const typingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const typingChannelRef = useRef<any>(null);
+  const offlineQueueKey = user && id ? `voiceid:offline-messages:${user.id}:${id}` : null;
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const setMessageReceipt = async (messageId: string, status: 'delivered' | 'read') => {
+    try {
+      const fn = status === 'read' ? 'mark_message_read' : 'mark_message_delivered';
+      const { error } = await supabase.rpc(fn, { p_message_id: messageId });
+      if (error) console.warn(`message ${status} receipt failed`, error.message);
+    } catch (err) {
+      console.warn(`message ${status} receipt failed`, err);
+    }
+  };
+
+  const markIncomingMessages = async (rows: any[], readNow: boolean) => {
+    const incoming = rows.filter(m => m.sender_id !== user?.id);
+    if (!incoming.length) return;
+    await Promise.all(incoming.map(m => setMessageReceipt(m.id, readNow ? 'read' : 'delivered')));
+  };
+
+  const flushOfflineQueue = async () => {
+    if (!offlineQueueKey || !navigator.onLine) return;
+    let queue: any[] = [];
+    try { queue = JSON.parse(localStorage.getItem(offlineQueueKey) || '[]'); } catch { queue = []; }
+    if (!queue.length) return;
+    const remaining: any[] = [];
+    for (const item of queue) {
+      const { error } = await supabase.from('messages').insert({
+        id: item.id,
+        conversation_id: id,
+        sender_id: user?.id,
+        content_body: item.content_body,
+        content_type: 'text'
+      });
+      if (error) remaining.push(item);
+    }
+    localStorage.setItem(offlineQueueKey, JSON.stringify(remaining));
+  };
+
+  const publishTyping = async (typing: boolean) => {
+    const ch = typingChannelRef.current;
+    if (!ch || !user || !id) return;
+    await ch.send({ type: 'broadcast', event: 'typing', payload: { userId: user.id, typing } });
+  };
+
+  const handleTyping = (value: string) => {
+    setNewMessage(value);
+    if (!value.trim()) {
+      if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
+      publishTyping(false);
+      return;
+    }
+    publishTyping(true);
+    if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
+    typingTimerRef.current = setTimeout(() => publishTyping(false), 1400);
+  };
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -127,7 +185,21 @@ export default function ChatPage() {
         .eq('conversation_id', id)
         .order('created_at', { ascending: true });
 
-      if (!error && data) setMessages(data);
+      if (!error && data) {
+        const messageIds = data.map((m: any) => m.id);
+        let receiptRows: any[] = [];
+        if (messageIds.length) {
+          const { data: receipts } = await supabase.from('message_receipts').select('message_id,user_id,delivered_at,read_at').in('message_id', messageIds);
+          receiptRows = receipts || [];
+        }
+        const receiptMap = new Map(receiptRows.filter((r: any) => r.user_id !== user.id).map((r: any) => [r.message_id, r]));
+        const merged = data.map((m: any) => {
+          const r: any = receiptMap.get(m.id);
+          return { ...m, delivery_status: m.sender_id === user.id ? (r?.read_at ? 'read' : r?.delivered_at ? 'delivered' : 'sent') : undefined };
+        });
+        setMessages(merged);
+        await markIncomingMessages(data, true);
+      }
       setMessagesLoading(false);
 
       const { data: members } = await supabase.from('conversation_members').select('user_id, profiles(display_name, avatar_url)').eq('conversation_id', id).neq('user_id', user.id);
@@ -138,23 +210,54 @@ export default function ChatPage() {
 
     const subscription = supabase
       .channel(`messages:${id}`)
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `conversation_id=eq.${id}` }, (payload) => {
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `conversation_id=eq.${id}` }, async (payload) => {
+        const msg: any = payload.new;
         setMessages(prev => {
-          if (prev.find(m => m.id === payload.new.id)) return prev;
-          return [...prev, payload.new].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+          if (prev.find(m => m.id === msg.id)) return prev;
+          return [...prev, msg].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
         });
+        if (msg.sender_id !== user.id) await setMessageReceipt(msg.id, 'read');
       })
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'messages', filter: `conversation_id=eq.${id}` }, (payload) => {
-        setMessages(prev => prev.map(m => m.id === payload.new.id ? payload.new : m));
+        setMessages(prev => prev.map(m => m.id === payload.new.id ? { ...m, ...payload.new } : m));
       })
       .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'messages', filter: `conversation_id=eq.${id}` }, (payload) => {
         setMessages(prev => prev.filter(m => m.id !== payload.old.id));
       })
-      .subscribe((status) => {
-      });
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'message_receipts' }, (payload) => {
+        const r: any = payload.new;
+        if (r.user_id === user.id) return;
+        setMessages(prev => prev.map(m => m.id === r.message_id ? { ...m, delivery_status: r.read_at ? 'read' : r.delivered_at ? 'delivered' : 'sent' } : m));
+      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'message_receipts' }, (payload) => {
+        const r: any = payload.new;
+        if (r.user_id === user.id) return;
+        setMessages(prev => prev.map(m => m.id === r.message_id ? { ...m, delivery_status: r.read_at ? 'read' : r.delivered_at ? 'delivered' : 'sent' } : m));
+      })
+      .on('broadcast', { event: 'typing' }, ({ payload }: any) => {
+        if (!payload || payload.userId === user.id) return;
+        setTypingUsers(prev => ({ ...prev, [payload.userId]: !!payload.typing }));
+        if (payload.typing) setTimeout(() => setTypingUsers(prev => ({ ...prev, [payload.userId]: false })), 1800);
+      })
+      .subscribe();
+    typingChannelRef.current = subscription;
 
-    return () => { supabase.removeChannel(subscription); };
+    return () => {
+      if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
+      publishTyping(false);
+      typingChannelRef.current = null;
+      supabase.removeChannel(subscription);
+    };
   }, [id, user, authLoading]);
+
+  useEffect(() => {
+    const onOnline = () => { setIsOnline(true); void flushOfflineQueue(); };
+    const onOffline = () => setIsOnline(false);
+    window.addEventListener('online', onOnline);
+    window.addEventListener('offline', onOffline);
+    void flushOfflineQueue();
+    return () => { window.removeEventListener('online', onOnline); window.removeEventListener('offline', onOffline); };
+  }, [offlineQueueKey, id, user?.id]);
 
   useEffect(() => { scrollRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
 
@@ -186,18 +289,30 @@ export default function ChatPage() {
     e.preventDefault();
     if (!newMessage.trim() || !user || !id) return;
 
+    const content = newMessage.trim();
+    const messageId = crypto.randomUUID();
+    setNewMessage('');
+    if (!navigator.onLine) {
+      const queued = JSON.parse(localStorage.getItem(offlineQueueKey || '') || '[]');
+      queued.push({ id: messageId, content_body: content, created_at: new Date().toISOString() });
+      if (offlineQueueKey) localStorage.setItem(offlineQueueKey, JSON.stringify(queued));
+      setMessages(prev => [...prev, { id: messageId, conversation_id: id, sender_id: user.id, content_body: content, content_type: 'text', created_at: new Date().toISOString(), delivery_status: 'sending' }]);
+      return;
+    }
+
     const { data, error } = await supabase.from('messages').insert({
+      id: messageId,
       conversation_id: id,
-      sender_id: user?.id,
-      content_body: newMessage,
+      sender_id: user.id,
+      content_body: content,
       content_type: 'text'
     }).select().single();
-    
     if (error) {
-        console.error('Message insert error:', error);
-        alert(`Failed to save message. Details: ${error.message}`);
-    } else {
-        setNewMessage('');
+      console.error('Message insert error:', error);
+      setMessages(prev => prev.map(m => m.id === messageId ? { ...m, delivery_status: 'failed' } : m));
+      alert(`Failed to save message. Details: ${error.message}`);
+    } else if (data) {
+      setMessages(prev => prev.map(m => m.id === messageId ? { ...data, delivery_status: 'sent' } : m));
     }
   };
 
@@ -272,7 +387,10 @@ export default function ChatPage() {
         <div className="w-10 h-10 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold overflow-hidden shrink-0">
              {otherUser?.profiles?.avatar_url ? <img src={otherUser.profiles.avatar_url} alt="" decoding="async" className="w-full h-full object-cover" /> : otherUser?.profiles?.display_name?.charAt(0)}
         </div>
-        <div className="flex-1 min-w-0 font-semibold text-gray-900 truncate">{otherUser?.profiles?.display_name || 'Conversation'}</div>
+        <div className="flex-1 min-w-0">
+          <div className="font-semibold text-gray-900 truncate">{otherUser?.profiles?.display_name || 'Conversation'}</div>
+          <div className="text-xs text-gray-500 h-4">{otherUser?.user_id && typingUsers[otherUser.user_id] ? 'typing…' : (otherUser?.user_id && isUserOnline(otherUser.user_id) ? 'online' : 'offline')}</div>
+        </div>
         {otherUser && (
             <div className="flex items-center gap-2 shrink-0">
                 <button onClick={handleCall} className={`p-2 hover:bg-gray-100 rounded-full ${!isUserOnline(otherUser.user_id) ? 'text-gray-400' : 'text-gray-600'}`} aria-label="Call">
@@ -283,6 +401,7 @@ export default function ChatPage() {
         )}
       </div>
       
+      {!isOnline && <div className="mx-3 mt-2 rounded-xl px-3 py-2 text-xs text-gray-600 bg-gray-100 border border-gray-200">You’re offline. Text messages will be queued and sent automatically when the connection returns.</div>}
       <div className="flex-1 overflow-y-auto overflow-x-hidden p-3 sm:p-4 space-y-3 sm:space-y-4">
         {messages.map((m) => (
           <MessageBubble
@@ -333,9 +452,10 @@ export default function ChatPage() {
           <>
             <input 
               value={newMessage}
-              onChange={(e) => setNewMessage(e.target.value)}
+              onChange={(e) => handleTyping(e.target.value)}
               className="flex-1 p-3 px-4 bg-gray-100 border-none rounded-full outline-none focus:ring-2 focus:ring-blue-500 min-w-0"
-              placeholder="Message..."
+              placeholder={isOnline ? 'Message...' : 'Offline — message will send when online'}
+              aria-label="Message"
             />
             <button type="submit" disabled={!newMessage.trim()} className="p-3 bg-blue-600 text-white rounded-full shrink-0 disabled:opacity-50" aria-label="Send message"><Send size={20} /></button>
           </>

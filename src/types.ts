@@ -18,5 +18,6 @@ export interface MessageReceipt {
   user_id: string;
   delivered_at: string | null;
   played_at: string | null;
+  read_at?: string | null;
   local_persist_confirmed_at: string | null;
 }

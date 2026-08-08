@@ -62,6 +62,18 @@ function VoiceMessageImpl({ message }: { message: any }) {
       audio.onended = () => setIsPlaying(false);
       await audio.play();
       setIsPlaying(true);
+      // Durable message read receipt. The legacy played RPC remains for
+      // voice-message expiry/cleanup semantics.
+      try {
+        await supabase.rpc('mark_message_read', { p_message_id: message.id });
+      } catch (err) {
+        console.warn('Failed to mark voice message read', err);
+      }
+      try {
+        await supabase.rpc('acknowledge_voice_played', { p_message_id: message.id });
+      } catch (_) {
+        // Legacy RPC may be unavailable for newer message rows; do not block playback.
+      }
     } catch (err) {
       console.error('VoiceMessage: failed to play audio', err);
       setError('Failed to load voice message.');
