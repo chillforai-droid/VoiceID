@@ -4,17 +4,25 @@ import { RealtimeChannel } from '@supabase/supabase-js';
 import { useAuth } from './AuthContext';
 import { usePresence } from './PresenceContext';
 
+export type CallType = 'voice' | 'video';
+
 interface VoiceCallContextType {
   callState: string;
   activeCall: any | null;
-  initiateCall: (receiverId: string) => Promise<void>;
+  callType: CallType;
+  initiateCall: (receiverId: string, callType?: CallType) => Promise<void>;
   acceptCall: () => Promise<void>;
   endCall: () => Promise<void>;
   cleanupCall: () => void;
   remoteAudioRef: React.RefObject<HTMLAudioElement>;
+  localVideoRef: React.RefObject<HTMLVideoElement>;
+  remoteVideoRef: React.RefObject<HTMLVideoElement>;
   canCallUser: (targetUserId: string) => Promise<{ canCall: boolean; reason?: string }>;
   isMuted: boolean;
   toggleMute: () => void;
+  isCameraOff: boolean;
+  toggleCamera: () => void;
+  switchCamera: () => Promise<void>;
 }
 
 const VoiceCallContext = createContext<VoiceCallContextType>({} as VoiceCallContextType);
@@ -52,9 +60,15 @@ export const VoiceCallProvider = ({ children }: { children: React.ReactNode }) =
   const callRowChannel = useRef<RealtimeChannel | null>(null);
   const iceCandidateQueue = useRef<RTCIceCandidate[]>([]);
   const remoteAudioRef = useRef<HTMLAudioElement | null>(null);
+  const localVideoRef = useRef<HTMLVideoElement | null>(null);
+  const remoteVideoRef = useRef<HTMLVideoElement | null>(null);
   const callTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const endingRef = useRef(false);
   const [isMuted, setIsMuted] = useState(false);
+  const [isCameraOff, setIsCameraOff] = useState(false);
+  const [callType, setCallType] = useState<CallType>('voice');
+  const callTypeRef = useRef<CallType>('voice');
+  const facingModeRef = useRef<'user' | 'environment'>('user');
 
   const setState = useCallback((state: string) => {
     callStateRef.current = state;
@@ -77,9 +91,15 @@ export const VoiceCallProvider = ({ children }: { children: React.ReactNode }) =
   }, []);
 
   const attachRemoteStream = useCallback((stream: MediaStream) => {
-    if (!remoteAudioRef.current) return;
-    remoteAudioRef.current.srcObject = stream;
-    void playRemoteAudio();
+    if (remoteAudioRef.current) {
+      remoteAudioRef.current.srcObject = stream;
+      void playRemoteAudio();
+    }
+    if (remoteVideoRef.current) {
+      remoteVideoRef.current.srcObject = stream;
+      remoteVideoRef.current.muted = false;
+      void remoteVideoRef.current.play().catch(() => { /* autoplay may need a tap */ });
+    }
   }, [playRemoteAudio]);
 
   const cleanupCall = useCallback(() => {
@@ -113,10 +133,22 @@ export const VoiceCallProvider = ({ children }: { children: React.ReactNode }) =
       remoteAudioRef.current.pause();
       remoteAudioRef.current.srcObject = null;
     }
+    if (remoteVideoRef.current) {
+      remoteVideoRef.current.pause();
+      remoteVideoRef.current.srcObject = null;
+    }
+    if (localVideoRef.current) {
+      localVideoRef.current.pause();
+      localVideoRef.current.srcObject = null;
+    }
 
     activeCallRef.current = null;
     setActiveCall(null);
     setIsMuted(false);
+    setIsCameraOff(false);
+    callTypeRef.current = 'voice';
+    setCallType('voice');
+    facingModeRef.current = 'user';
     setState('idle');
   }, [clearCallTimer, setState]);
 
@@ -136,6 +168,37 @@ export const VoiceCallProvider = ({ children }: { children: React.ReactNode }) =
     if (!track) return;
     track.enabled = !track.enabled;
     setIsMuted(!track.enabled);
+  }, []);
+
+  const toggleCamera = useCallback(() => {
+    const track = localStream.current?.getVideoTracks()[0];
+    if (!track) return;
+    track.enabled = !track.enabled;
+    setIsCameraOff(!track.enabled);
+  }, []);
+
+  const switchCamera = useCallback(async () => {
+    const pc = peerConnection.current;
+    const stream = localStream.current;
+    if (!pc || !stream) return;
+    const oldTrack = stream.getVideoTracks()[0];
+    if (!oldTrack) return;
+    facingModeRef.current = facingModeRef.current === 'user' ? 'environment' : 'user';
+    try {
+      const newStream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: facingModeRef.current },
+      });
+      const newTrack = newStream.getVideoTracks()[0];
+      const sender = pc.getSenders().find(s => s.track?.kind === 'video');
+      if (sender) await sender.replaceTrack(newTrack);
+      stream.removeTrack(oldTrack);
+      oldTrack.stop();
+      stream.addTrack(newTrack);
+      if (localVideoRef.current) localVideoRef.current.srcObject = stream;
+    } catch (error) {
+      console.error('[VOICEID_CALL] switchCamera failed', error);
+      facingModeRef.current = facingModeRef.current === 'user' ? 'environment' : 'user';
+    }
   }, []);
 
   const attachPeerHandlers = useCallback((pc: RTCPeerConnection, channel: RealtimeChannel) => {
@@ -169,11 +232,18 @@ export const VoiceCallProvider = ({ children }: { children: React.ReactNode }) =
     peerConnection.current = pc;
     attachPeerHandlers(pc, channel);
     try {
+      const wantsVideo = callTypeRef.current === 'video';
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+        video: wantsVideo ? { facingMode: facingModeRef.current, width: { ideal: 1280 }, height: { ideal: 720 } } : false,
       });
       localStream.current = stream;
       stream.getTracks().forEach(track => pc.addTrack(track, stream));
+      if (wantsVideo && localVideoRef.current) {
+        localVideoRef.current.srcObject = stream;
+        localVideoRef.current.muted = true;
+        void localVideoRef.current.play().catch(() => {});
+      }
       return pc;
     } catch (error) {
       try { pc.close(); } catch {}
@@ -230,13 +300,17 @@ export const VoiceCallProvider = ({ children }: { children: React.ReactNode }) =
     return { canCall: true };
   }, [user, isUserOnline]);
 
-  const initiateCall = useCallback(async (receiverId: string) => {
+  const initiateCall = useCallback(async (receiverId: string, requestedType: CallType = 'voice') => {
     if (!user || callStateRef.current !== 'idle') return;
     const { canCall, reason } = await canCallUser(receiverId);
     if (!canCall) { alert(reason); return; }
 
+    callTypeRef.current = requestedType;
+    setCallType(requestedType);
+    facingModeRef.current = 'user';
+
     const { data: call, error } = await supabase.from('calls')
-      .insert({ caller_id: user.id, receiver_id: receiverId, status: 'ringing' })
+      .insert({ caller_id: user.id, receiver_id: receiverId, status: 'ringing', call_type: requestedType })
       .select().single();
     if (error || !call) { console.error('[VOICEID_CALL] create failed', error); return; }
 
@@ -292,6 +366,13 @@ export const VoiceCallProvider = ({ children }: { children: React.ReactNode }) =
     const { data: latest } = await supabase.from('calls').select('*').eq('id', call.id).maybeSingle();
     if (!latest || latest.status !== 'ringing') { cleanupCall(); return; }
 
+    const resolvedType: CallType = latest.call_type === 'video' ? 'video' : 'voice';
+    callTypeRef.current = resolvedType;
+    setCallType(resolvedType);
+    facingModeRef.current = 'user';
+    activeCallRef.current = latest;
+    setActiveCall(latest);
+
     clearCallTimer();
     setState('connecting');
     subscribeCallUpdates(call.id);
@@ -341,6 +422,9 @@ export const VoiceCallProvider = ({ children }: { children: React.ReactNode }) =
       if (payload.new.status === 'ringing' && callStateRef.current === 'idle') {
         activeCallRef.current = payload.new;
         setActiveCall(payload.new);
+        const incomingType: CallType = payload.new.call_type === 'video' ? 'video' : 'voice';
+        callTypeRef.current = incomingType;
+        setCallType(incomingType);
         setState('ringing-incoming');
       }
     });
@@ -363,9 +447,10 @@ export const VoiceCallProvider = ({ children }: { children: React.ReactNode }) =
   }, [cleanupCall]);
 
   const value = useMemo(() => ({
-    callState, activeCall, initiateCall, acceptCall, endCall, cleanupCall,
-    remoteAudioRef, canCallUser, isMuted, toggleMute,
-  }), [callState, activeCall, initiateCall, acceptCall, endCall, cleanupCall, canCallUser, isMuted, toggleMute]);
+    callState, activeCall, callType, initiateCall, acceptCall, endCall, cleanupCall,
+    remoteAudioRef, localVideoRef, remoteVideoRef, canCallUser, isMuted, toggleMute,
+    isCameraOff, toggleCamera, switchCamera,
+  }), [callState, activeCall, callType, initiateCall, acceptCall, endCall, cleanupCall, canCallUser, isMuted, toggleMute, isCameraOff, toggleCamera, switchCamera]);
 
   return <VoiceCallContext.Provider value={value}>{children}</VoiceCallContext.Provider>;
 };

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import { Phone, MessageCircle, UserPlus, Loader2, UserCheck, UserX, Ban, Share, Copy, Check, LogIn, UserRoundPlus, Link2 } from 'lucide-react';
+import { Phone, Video, MessageCircle, UserPlus, Loader2, UserCheck, UserX, Ban, Share, Copy, Check, LogIn, UserRoundPlus, Link2 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useVoiceCall } from '../hooks/useVoiceCall';
 import { usePresence } from '../context/PresenceContext';
@@ -98,7 +98,16 @@ export default function UserProfilePage() {
       if (!canCall) {
           alert(reason);
       } else {
-          initiateCall(resolvedProfileId!);
+          initiateCall(resolvedProfileId!, 'voice');
+      }
+  };
+
+  const handleVideoCall = async () => {
+      const { canCall, reason } = await canCallUser(resolvedProfileId!);
+      if (!canCall) {
+          alert(reason);
+      } else {
+          initiateCall(resolvedProfileId!, 'video');
       }
   };
 
@@ -323,6 +332,7 @@ export default function UserProfilePage() {
 
                 <div className="flex flex-wrap gap-3 justify-center mt-5">
                   <button onClick={handleCall} disabled={!isOnline || contactRelation.status !== 'accepted'} aria-label="Call" title="Call" className={`min-w-[92px] px-4 py-3 rounded-2xl transition flex items-center justify-center gap-2 font-semibold ${!isOnline || contactRelation.status !== 'accepted' ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-blue-50 text-blue-600 hover:bg-blue-100'}`}><Phone size={20} /><span>Call</span></button>
+                  <button onClick={handleVideoCall} disabled={!isOnline || contactRelation.status !== 'accepted'} aria-label="Video Call" title="Video Call" className={`min-w-[92px] px-4 py-3 rounded-2xl transition flex items-center justify-center gap-2 font-semibold ${!isOnline || contactRelation.status !== 'accepted' ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-blue-50 text-blue-600 hover:bg-blue-100'}`}><Video size={20} /><span>Video</span></button>
                   <button onClick={handleMessageAction} aria-label="Message" title="Message" className="min-w-[108px] px-4 py-3 bg-purple-50 text-purple-600 rounded-2xl hover:bg-purple-100 transition flex items-center justify-center gap-2 font-semibold"><MessageCircle size={20} /><span>Message</span></button>
                   <button onClick={handleShare} aria-label="Share profile" title="Share profile" className="min-w-[92px] px-4 py-3 bg-gray-100 text-gray-600 rounded-2xl hover:bg-gray-200 transition flex items-center justify-center gap-2 font-semibold"><Share size={20} /><span>Share</span></button>
                   {contactRelation.status === 'accepted' && <button onClick={() => handleContactAction('remove')} aria-label="Remove contact" title="Remove contact" className="p-3 bg-red-50 text-red-600 rounded-2xl hover:bg-red-100 transition"><UserX size={20} /></button>}

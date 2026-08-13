@@ -3,7 +3,7 @@ import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { useNotifications } from '../context/NotificationContext';
-import { Send, Loader2, ArrowLeft, Phone, Image as ImageIcon, WifiOff, Clock3 } from 'lucide-react';
+import { Send, Loader2, ArrowLeft, Phone, Video, Image as ImageIcon, WifiOff, Clock3 } from 'lucide-react';
 import { VoiceRecorder } from '../components/chat/VoiceRecorder';
 import { MessageBubble } from '../components/chat/MessageBubble';
 import { ConfirmDialog } from '../components/chat/ConfirmDialog';
@@ -186,7 +186,17 @@ export default function ChatPage() {
       if (!canCall) {
           alert(reason);
       } else {
-          initiateCall(otherUser.user_id);
+          initiateCall(otherUser.user_id, 'voice');
+      }
+  };
+
+  const handleVideoCall = async () => {
+      if (!otherUser?.user_id) return;
+      const { canCall, reason } = await canCallUser(otherUser.user_id);
+      if (!canCall) {
+          alert(reason);
+      } else {
+          initiateCall(otherUser.user_id, 'video');
       }
   };
 
@@ -423,6 +433,9 @@ export default function ChatPage() {
         </div>
         {otherUser && (
             <div className="flex items-center gap-1 shrink-0">
+                <button onClick={handleVideoCall} disabled={!isNetworkOnline || !isUserOnline(otherUser.user_id)} className={`p-2 hover:bg-gray-100 rounded-full disabled:opacity-40 ${isUserOnline(otherUser.user_id) ? 'text-gray-600' : 'text-gray-400'}`} aria-label="Video Call">
+                    <Video size={20} />
+                </button>
                 <button onClick={handleCall} disabled={!isNetworkOnline || !isUserOnline(otherUser.user_id)} className={`p-2 hover:bg-gray-100 rounded-full disabled:opacity-40 ${isUserOnline(otherUser.user_id) ? 'text-gray-600' : 'text-gray-400'}`} aria-label="Call">
                     <Phone size={20} />
                 </button>
