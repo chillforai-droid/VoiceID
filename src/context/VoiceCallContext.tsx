@@ -177,29 +177,63 @@ export const VoiceCallProvider = ({ children }: { children: React.ReactNode }) =
     setIsCameraOff(!track.enabled);
   }, []);
 
+  const getStreamForFacing = useCallback(async (facing: 'user' | 'environment'): Promise<MediaStream> => {
+    try {
+      return await navigator.mediaDevices.getUserMedia({ video: { facingMode: { exact: facing } } });
+    } catch {
+      // exact match not supported (common on laptops / some Android browsers) — try as a hint
+      try {
+        return await navigator.mediaDevices.getUserMedia({ video: { facingMode: facing } });
+      } catch {
+        // Last resort: pick a different physical camera by deviceId
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const cams = devices.filter(d => d.kind === 'videoinput');
+        const currentId = localStream.current?.getVideoTracks()[0]?.getSettings().deviceId;
+        const next = cams.find(d => d.deviceId !== currentId) || cams[0];
+        if (!next) throw new Error('No alternate camera available');
+        return await navigator.mediaDevices.getUserMedia({ video: { deviceId: { exact: next.deviceId } } });
+      }
+    }
+  }, []);
+
   const switchCamera = useCallback(async () => {
     const pc = peerConnection.current;
     const stream = localStream.current;
     if (!pc || !stream) return;
     const oldTrack = stream.getVideoTracks()[0];
     if (!oldTrack) return;
-    facingModeRef.current = facingModeRef.current === 'user' ? 'environment' : 'user';
+
+    const nextFacing = facingModeRef.current === 'user' ? 'environment' : 'user';
     try {
-      const newStream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: facingModeRef.current },
-      });
-      const newTrack = newStream.getVideoTracks()[0];
-      const sender = pc.getSenders().find(s => s.track?.kind === 'video');
-      if (sender) await sender.replaceTrack(newTrack);
+      // Free the camera hardware first — some devices (especially mobile) won't hand out
+      // a second camera stream while the first one is still active.
       stream.removeTrack(oldTrack);
       oldTrack.stop();
+
+      const newStream = await getStreamForFacing(nextFacing);
+      const newTrack = newStream.getVideoTracks()[0];
+
+      const sender = pc.getSenders().find(s => s.track?.kind === 'video');
+      if (sender) await sender.replaceTrack(newTrack);
       stream.addTrack(newTrack);
+
+      facingModeRef.current = nextFacing;
       if (localVideoRef.current) localVideoRef.current.srcObject = stream;
     } catch (error) {
       console.error('[VOICEID_CALL] switchCamera failed', error);
-      facingModeRef.current = facingModeRef.current === 'user' ? 'environment' : 'user';
+      // Try to restore the original camera so the call doesn't end up without video
+      try {
+        const restored = await getStreamForFacing(facingModeRef.current);
+        const restoredTrack = restored.getVideoTracks()[0];
+        const sender = pc.getSenders().find(s => s.track?.kind === 'video');
+        if (sender) await sender.replaceTrack(restoredTrack);
+        stream.addTrack(restoredTrack);
+        if (localVideoRef.current) localVideoRef.current.srcObject = stream;
+      } catch (restoreError) {
+        console.error('[VOICEID_CALL] switchCamera restore failed', restoreError);
+      }
     }
-  }, []);
+  }, [getStreamForFacing]);
 
   const attachPeerHandlers = useCallback((pc: RTCPeerConnection, channel: RealtimeChannel) => {
     pc.onicecandidate = event => {

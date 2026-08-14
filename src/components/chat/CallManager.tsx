@@ -1,8 +1,10 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useVoiceCall } from '../../hooks/useVoiceCall';
 import { PhoneOff, Mic, MicOff, Phone, Video, VideoOff, SwitchCamera } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
+
+const CONTROLS_HIDE_DELAY = 4000;
 
 export const CallManager = () => {
   const {
@@ -12,6 +14,8 @@ export const CallManager = () => {
   } = useVoiceCall();
   const [otherProfile, setOtherProfile] = useState<any>(null);
   const { user } = useAuth();
+  const [controlsVisible, setControlsVisible] = useState(true);
+  const hideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (!activeCall || !user) { setOtherProfile(null); return; }
@@ -19,17 +23,46 @@ export const CallManager = () => {
     supabase.from('profiles').select('*').eq('id', otherId).maybeSingle().then(({ data }) => setOtherProfile(data));
   }, [activeCall, user]);
 
+  const isVideo = callType === 'video';
+  const isConnectedVideoCall = isVideo && callState === 'connected';
+
+  // Auto-hide the overlay a few seconds into a connected video call so it doesn't
+  // block the view; tapping the screen brings it back.
+  useEffect(() => {
+    if (!isConnectedVideoCall) {
+      setControlsVisible(true);
+      if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
+      return;
+    }
+    hideTimerRef.current = setTimeout(() => setControlsVisible(false), CONTROLS_HIDE_DELAY);
+    return () => { if (hideTimerRef.current) clearTimeout(hideTimerRef.current); };
+  }, [isConnectedVideoCall]);
+
+  const handleScreenTap = () => {
+    if (!isConnectedVideoCall) return;
+    if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
+    if (controlsVisible) {
+      setControlsVisible(false);
+    } else {
+      setControlsVisible(true);
+      hideTimerRef.current = setTimeout(() => setControlsVisible(false), CONTROLS_HIDE_DELAY);
+    }
+  };
+
   if (callState === 'idle') return null;
 
   const name = otherProfile?.display_name || otherProfile?.username || 'VoiceID User';
   const isIncoming = callState === 'ringing-incoming';
   const isOutgoing = callState === 'ringing-outgoing';
   const isActive = callState === 'connected' || callState === 'connecting';
-  const isVideo = callType === 'video';
   const showRemoteVideo = isVideo && (callState === 'connected' || callState === 'connecting');
+  const showOverlay = !isConnectedVideoCall || controlsVisible;
 
   return (
-    <div className={`fixed inset-0 z-[100] flex flex-col items-center justify-center p-6 pt-safe pb-safe transition-colors ${isVideo ? 'bg-black text-white' : 'bg-white dark:bg-slate-950 text-gray-900 dark:text-white'}`}>
+    <div
+      onClick={handleScreenTap}
+      className={`fixed inset-0 z-[100] flex flex-col items-center justify-center p-6 pt-safe pb-safe transition-colors ${isVideo ? 'bg-black text-white' : 'bg-white dark:bg-slate-950 text-gray-900 dark:text-white'}`}
+    >
       <audio ref={remoteAudioRef} autoPlay playsInline className={isVideo ? 'hidden' : ''} />
 
       {isVideo && (
@@ -60,16 +93,18 @@ export const CallManager = () => {
         </div>
       )}
 
-      <h2 className={`text-2xl font-bold px-4 max-w-full truncate relative z-10 ${isVideo ? 'drop-shadow-lg' : ''}`}>{name}</h2>
-      <p className={`mt-2 relative z-10 ${isVideo ? 'text-gray-200 drop-shadow' : 'text-gray-500 dark:text-slate-400'}`}>
-        {isIncoming
-          ? (isVideo ? 'Incoming video call' : 'Incoming voice call')
-          : isOutgoing
-            ? 'Calling…'
-            : callState === 'connecting'
-              ? 'Connecting…'
-              : 'Connected'}
-      </p>
+      <div className={`flex flex-col items-center transition-opacity duration-300 ${showOverlay ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
+        <h2 className={`text-2xl font-bold px-4 max-w-full truncate relative z-10 ${isVideo ? 'drop-shadow-lg' : ''}`}>{name}</h2>
+        <p className={`mt-2 relative z-10 ${isVideo ? 'text-gray-200 drop-shadow' : 'text-gray-500 dark:text-slate-400'}`}>
+          {isIncoming
+            ? (isVideo ? 'Incoming video call' : 'Incoming voice call')
+            : isOutgoing
+              ? 'Calling…'
+              : callState === 'connecting'
+                ? 'Connecting…'
+                : 'Connected'}
+        </p>
+      </div>
 
       {isIncoming && (
         <div className="mt-10 flex gap-10 items-center relative z-10">
@@ -83,7 +118,10 @@ export const CallManager = () => {
       )}
 
       {(isOutgoing || isActive) && (
-        <div className="mt-10 flex items-center gap-6 relative z-10 flex-wrap justify-center">
+        <div
+          onClick={e => e.stopPropagation()}
+          className={`mt-10 flex items-center gap-6 relative z-10 flex-wrap justify-center transition-opacity duration-300 ${showOverlay ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
+        >
           {isActive && (
             <button aria-label={isMuted ? 'Unmute microphone' : 'Mute microphone'} onClick={toggleMute}
               className={`w-16 h-16 rounded-full flex items-center justify-center transition ${isMuted ? 'bg-white text-gray-900 ring-2 ring-blue-500' : isVideo ? 'bg-white/20 text-white backdrop-blur' : 'bg-slate-100 dark:bg-slate-800 text-gray-900 dark:text-white'}`}>
