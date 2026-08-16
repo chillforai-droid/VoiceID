@@ -25,6 +25,14 @@
       "destination": "/api/delete/:objectKey"
     },
     {
+      "source": "/api/media/story",
+      "destination": "/api/story-media"
+    },
+    {
+      "source": "/u/:username",
+      "destination": "/api/profile-og"
+    },
+    {
       "source": "/((?!api/).*)",
       "destination": "/index.html"
     }

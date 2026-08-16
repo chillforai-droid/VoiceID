@@ -7,6 +7,8 @@ import downloadAuthHandler from "./api/download-auth";
 import downloadHandler from "./api/download";
 import ackHandler from "./api/ack";
 import deleteHandler from "./api/delete/[objectKey]";
+import profileOgHandler from "./api/profile-og";
+import storyMediaHandler from "./api/story-media";
 
 async function startServer() {
   const app = express();
@@ -22,6 +24,13 @@ async function startServer() {
   app.delete("/api/media/delete/:objectKey", (req, res) => {
     (req as any).query = { ...req.query, objectKey: req.params.objectKey };
     deleteHandler(req as any, res as any);
+  });
+  app.get("/api/media/story", (req, res) => storyMediaHandler(req as any, res as any));
+  // Server-render per-user OG meta tags (avatar image, name, bio) so social apps
+  // show the shared profile's own photo instead of the generic site preview.
+  app.get("/u/:username", (req, res) => {
+    (req as any).query = { ...req.query, username: req.params.username };
+    profileOgHandler(req as any, res as any);
   });
 
   // Vite middleware

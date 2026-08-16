@@ -1,6 +1,7 @@
 import { useAuth } from '../context/AuthContext';
 import { Mail, Search, MessageSquare } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { StoriesBar } from '../components/stories/StoriesBar';
 
 export default function HomePage() {
   const { profile } = useAuth();
@@ -27,6 +28,8 @@ export default function HomePage() {
           <p className="text-gray-500">How's your voice today?</p>
         </div>
       </div>
+
+      <StoriesBar />
 
       <section>
         <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-4">Quick Actions</h2>
