@@ -1,4 +1,4 @@
-# VoiceID
+VoiceID
 
 VoiceID is a secure, username-based communication platform that allows users to connect, message, and talk without sharing their personal phone numbers.
 
