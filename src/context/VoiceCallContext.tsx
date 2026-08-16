@@ -103,6 +103,10 @@ export const VoiceCallProvider = ({ children }: { children: React.ReactNode }) =
   }, [playRemoteAudio]);
 
   const cleanupCall = useCallback(() => {
+    // Android app only: switch audio routing back to normal (this is a no-op
+    // in a regular browser since window.AndroidAudioRouter won't exist there)
+    (window as any).AndroidAudioRouter?.endCallAudio();
+
     clearCallTimer();
     endingRef.current = false;
 
@@ -249,7 +253,12 @@ export const VoiceCallProvider = ({ children }: { children: React.ReactNode }) =
 
     pc.onconnectionstatechange = () => {
       const state = pc.connectionState;
-      if (state === 'connected') setState('connected');
+      if (state === 'connected') {
+        setState('connected');
+        // Android app only: route call audio to the earpiece instead of the
+        // loudspeaker (no-op in a regular browser)
+        (window as any).AndroidAudioRouter?.startCallAudio();
+      }
       else if (state === 'failed') void failCall('कॉल कनेक्ट नहीं हो पाई। कृपया नेटवर्क बदलकर फिर कोशिश करें।');
       else if (state === 'closed' && callStateRef.current !== 'idle') cleanupCall();
     };
