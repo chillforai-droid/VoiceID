@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.voiceid.webapp",
+      "sha256_cert_fingerprints": [
+        "44:73:9E:28:7E:A3:98:6E:46:21:03:2D:D4:51:96:6A:A0:85:21:70:5C:71:68:60:D6:EE:25:7F:88:86:45:8F"
+      ]
+    }
+  }
+]
