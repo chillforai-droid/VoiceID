@@ -41,6 +41,43 @@ export function VoiceRecorder({ onSent, onAudioPreview }: { onSent: () => void, 
 
   const startRecording = async () => {
     setError(null);
+
+    // Inside the Android app: record natively instead of relying on the
+    // WebView's embedded getUserMedia/MediaRecorder (unreliable audio
+    // capture on some devices/WebView versions). Falls through to the
+    // normal browser path below when not running inside the app.
+    const nativeRecorder = (window as any).AndroidRecorder;
+    if (nativeRecorder) {
+      (window as any).__voiceIdDeliverRecording = (base64: string, mimeType: string) => {
+        try {
+          const byteChars = atob(base64);
+          const byteNumbers = new Array(byteChars.length);
+          for (let i = 0; i < byteChars.length; i++) byteNumbers[i] = byteChars.charCodeAt(i);
+          const byteArray = new Uint8Array(byteNumbers);
+          const blob = new Blob([byteArray], { type: mimeType || 'audio/mp4' });
+          setAudioBlob(blob);
+          const actualDuration = Math.round((Date.now() - startTimeRef.current) / 1000);
+          setDuration(Math.max(1, Math.min(actualDuration, 120)));
+        } catch {
+          setError('Recording could not be processed.');
+        }
+        setIsRecording(false);
+      };
+      (window as any).__voiceIdRecordingError = (message: string) => {
+        setError(`Microphone error: ${message}`);
+        setIsRecording(false);
+      };
+
+      try {
+        nativeRecorder.startRecording();
+        startTimeRef.current = Date.now();
+        setIsRecording(true);
+      } catch (err: any) {
+        setError(`Microphone error: ${err.message || 'Unknown error'}`);
+      }
+      return;
+    }
+
     if (!window.isSecureContext) {
       setError("Microphone recording is unavailable in this insecure context.");
       return;
@@ -82,6 +119,11 @@ export function VoiceRecorder({ onSent, onAudioPreview }: { onSent: () => void, 
   };
 
   const stopRecording = () => {
+    const nativeRecorder = (window as any).AndroidRecorder;
+    if (nativeRecorder && isRecording) {
+      nativeRecorder.stopRecording();
+      return;
+    }
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
       mediaRecorderRef.current.stop();
       setIsRecording(false);
@@ -251,4 +293,4 @@ export function VoiceRecorder({ onSent, onAudioPreview }: { onSent: () => void, 
       </div>
     </div>
   );
-  }
+        }
