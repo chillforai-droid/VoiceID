@@ -60,6 +60,38 @@ export function StoryComposer({ onClose, onPosted }: { onClose: () => void; onPo
 
   const startRecording = async () => {
     setError(null);
+
+    const nativeRecorder = (window as any).AndroidRecorder;
+    if (nativeRecorder) {
+      (window as any).__voiceIdDeliverRecording = (base64: string, mimeType: string) => {
+        try {
+          const byteChars = atob(base64);
+          const byteNumbers = new Array(byteChars.length);
+          for (let i = 0; i < byteChars.length; i++) byteNumbers[i] = byteChars.charCodeAt(i);
+          const byteArray = new Uint8Array(byteNumbers);
+          const blob = new Blob([byteArray], { type: mimeType || 'audio/mp4' });
+          setAudioBlob(blob);
+          setDuration(Math.max(1, Math.min(Math.round((Date.now() - startTimeRef.current) / 1000), 60)));
+        } catch {
+          setError('Recording could not be processed.');
+        }
+        setIsRecording(false);
+      };
+      (window as any).__voiceIdRecordingError = (message: string) => {
+        setError(`Microphone error: ${message}`);
+        setIsRecording(false);
+      };
+
+      try {
+        nativeRecorder.startRecording();
+        startTimeRef.current = Date.now();
+        setIsRecording(true);
+      } catch (err: any) {
+        setError(`Microphone error: ${err.message || 'Unknown error'}`);
+      }
+      return;
+    }
+
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       streamRef.current = stream;
@@ -82,6 +114,11 @@ export function StoryComposer({ onClose, onPosted }: { onClose: () => void; onPo
   };
 
   const stopRecording = () => {
+    const nativeRecorder = (window as any).AndroidRecorder;
+    if (nativeRecorder && isRecording) {
+      nativeRecorder.stopRecording();
+      return;
+    }
     mediaRecorderRef.current?.stop();
     setIsRecording(false);
     streamRef.current?.getTracks().forEach(t => t.stop());
@@ -239,4 +276,4 @@ export function StoryComposer({ onClose, onPosted }: { onClose: () => void; onPo
       <input ref={fileInputRef} type="file" className="hidden" onChange={onFileChosen} />
     </div>
   );
-}
+          }
