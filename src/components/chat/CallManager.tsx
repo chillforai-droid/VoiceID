@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useVoiceCall } from '../../hooks/useVoiceCall';
-import { PhoneOff, Mic, MicOff, Phone, Video, VideoOff, SwitchCamera } from 'lucide-react';
+import { PhoneOff, Mic, MicOff, Phone, Video, VideoOff, SwitchCamera, Volume2, Volume1 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
 
@@ -16,6 +16,16 @@ export const CallManager = () => {
   const { user } = useAuth();
   const [controlsVisible, setControlsVisible] = useState(true);
   const hideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Android app only — the site defaults to earpiece automatically, this
+  // lets the user flip to loudspeaker and back, same as a real phone dialer.
+  const hasNativeAudioRouter = typeof window !== 'undefined' && !!(window as any).AndroidAudioRouter;
+  const [isSpeakerOn, setIsSpeakerOn] = useState(false);
+  const toggleSpeaker = () => {
+    const next = !isSpeakerOn;
+    setIsSpeakerOn(next);
+    (window as any).AndroidAudioRouter?.setSpeakerOn?.(next);
+  };
 
   useEffect(() => {
     if (!activeCall || !user) { setOtherProfile(null); return; }
@@ -126,6 +136,13 @@ export const CallManager = () => {
             <button aria-label={isMuted ? 'Unmute microphone' : 'Mute microphone'} onClick={toggleMute}
               className={`w-16 h-16 rounded-full flex items-center justify-center transition ${isMuted ? 'bg-white text-gray-900 ring-2 ring-blue-500' : isVideo ? 'bg-white/20 text-white backdrop-blur' : 'bg-slate-100 dark:bg-slate-800 text-gray-900 dark:text-white'}`}>
               {isMuted ? <MicOff size={26} /> : <Mic size={26} />}
+            </button>
+          )}
+
+          {isActive && hasNativeAudioRouter && (
+            <button aria-label={isSpeakerOn ? 'Switch to earpiece' : 'Switch to loudspeaker'} onClick={toggleSpeaker}
+              className={`w-16 h-16 rounded-full flex items-center justify-center transition ${isSpeakerOn ? 'bg-white text-gray-900 ring-2 ring-blue-500' : isVideo ? 'bg-white/20 text-white backdrop-blur' : 'bg-slate-100 dark:bg-slate-800 text-gray-900 dark:text-white'}`}>
+              {isSpeakerOn ? <Volume2 size={26} /> : <Volume1 size={26} />}
             </button>
           )}
 
