@@ -73,6 +73,19 @@ export const VoiceCallProvider = ({ children }: { children: React.ReactNode }) =
   const setState = useCallback((state: string) => {
     callStateRef.current = state;
     setCallState(state);
+
+    // Android app only: play/stop the incoming-call ringtone natively (more
+    // reliable than an in-page <audio> element, which needs autoplay to
+    // work and won't ring while the app is backgrounded). No-op in a
+    // regular browser since window.AndroidAudioRouter won't exist there.
+    const audioRouter = (window as any).AndroidAudioRouter;
+    if (audioRouter) {
+      if (state === 'ringing-incoming') {
+        audioRouter.startRingtone?.();
+      } else {
+        audioRouter.stopRingtone?.();
+      }
+    }
   }, []);
 
   const clearCallTimer = useCallback(() => {
@@ -103,10 +116,6 @@ export const VoiceCallProvider = ({ children }: { children: React.ReactNode }) =
   }, [playRemoteAudio]);
 
   const cleanupCall = useCallback(() => {
-    // Android app only: switch audio routing back to normal (this is a no-op
-    // in a regular browser since window.AndroidAudioRouter won't exist there)
-    (window as any).AndroidAudioRouter?.endCallAudio();
-
     clearCallTimer();
     endingRef.current = false;
 
@@ -253,12 +262,7 @@ export const VoiceCallProvider = ({ children }: { children: React.ReactNode }) =
 
     pc.onconnectionstatechange = () => {
       const state = pc.connectionState;
-      if (state === 'connected') {
-        setState('connected');
-        // Android app only: route call audio to the earpiece instead of the
-        // loudspeaker (no-op in a regular browser)
-        (window as any).AndroidAudioRouter?.startCallAudio();
-      }
+      if (state === 'connected') setState('connected');
       else if (state === 'failed') void failCall('कॉल कनेक्ट नहीं हो पाई। कृपया नेटवर्क बदलकर फिर कोशिश करें।');
       else if (state === 'closed' && callStateRef.current !== 'idle') cleanupCall();
     };
