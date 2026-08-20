@@ -53,24 +53,59 @@ export function useStories() {
 
   const refresh = useCallback(async () => {
     setLoading(true);
-    const { data, error } = await supabase
+
+    // Fetch stories WITHOUT an embedded profiles(...) join. PostgREST embeds
+    // can silently fail for a given role (permission or relationship-cache
+    // issue) — the row still comes back, just with profiles: null — and the
+    // old code's `if (!profile) continue;` meant such stories quietly
+    // vanished with no error and no console warning at all. Fetching stories
+    // and profiles separately and merging in JS avoids that failure mode
+    // entirely: a broken join can no longer hide otherwise-valid stories.
+    const { data: storyRows, error: storiesError } = await supabase
       .from('stories')
-      .select('*, profiles(id, username, display_name, avatar_url)')
+      .select('*')
       .gt('expires_at', new Date().toISOString())
       .order('created_at', { ascending: true })
       .limit(300);
 
-    if (error) {
-      console.error('Failed to load stories:', error);
+    if (storiesError) {
+      console.error('Failed to load stories:', storiesError);
       setGroups([]);
       setLoading(false);
       return;
     }
 
+    const rows = (storyRows || []) as any[];
+    const userIds = Array.from(new Set(rows.map(r => r.user_id).filter(Boolean)));
+
+    const profileById = new Map<string, { id: string; username: string; display_name: string | null; avatar_url: string | null }>();
+    if (userIds.length > 0) {
+      const { data: profileRows, error: profilesError } = await supabase
+        .from('profiles')
+        .select('id, username, display_name, avatar_url')
+        .in('id', userIds);
+
+      if (profilesError) {
+        // Don't blank out the whole list just because the profile lookup
+        // failed — log it and fall back to a placeholder below instead.
+        console.error('Failed to load story authors:', profilesError);
+      } else {
+        for (const p of (profileRows || []) as any[]) {
+          profileById.set(p.id, p);
+        }
+      }
+    }
+
     const byUser = new Map<string, StoryGroup>();
-    for (const row of (data || []) as any[]) {
-      const profile = row.profiles;
-      if (!profile) continue;
+    for (const row of rows) {
+      // Fall back to a minimal placeholder profile rather than dropping the
+      // story outright if a profile row is somehow missing.
+      const profile = profileById.get(row.user_id) || {
+        id: row.user_id,
+        username: 'unknown',
+        display_name: null,
+        avatar_url: null,
+      };
       const existing = byUser.get(profile.id);
       const story: Story = {
         id: row.id,
@@ -134,16 +169,35 @@ export function useStories() {
   }, [user]);
 
   const getViewers = useCallback(async (storyId: string) => {
-    const { data, error } = await supabase
+    const { data: viewRows, error } = await supabase
       .from('story_views')
-      .select('viewer_id, viewed_at, profiles(username, display_name, avatar_url)')
+      .select('viewer_id, viewed_at')
       .eq('story_id', storyId)
       .order('viewed_at', { ascending: false });
     if (error) {
       console.error('Failed to load story viewers:', error);
       return [];
     }
-    return data || [];
+    const rows = viewRows || [];
+    const viewerIds = Array.from(new Set(rows.map(r => r.viewer_id).filter(Boolean)));
+    const profileById = new Map<string, { username: string; display_name: string | null; avatar_url: string | null }>();
+    if (viewerIds.length > 0) {
+      const { data: profileRows, error: profilesError } = await supabase
+        .from('profiles')
+        .select('id, username, display_name, avatar_url')
+        .in('id', viewerIds);
+      if (profilesError) {
+        console.error('Failed to load viewer profiles:', profilesError);
+      } else {
+        for (const p of (profileRows || []) as any[]) {
+          profileById.set(p.id, p);
+        }
+      }
+    }
+    return rows.map(r => ({
+      ...r,
+      profiles: profileById.get(r.viewer_id) || null,
+    }));
   }, []);
 
   const deleteStory = useCallback(async (storyId: string) => {
