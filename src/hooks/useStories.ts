@@ -17,13 +17,65 @@ export interface Story {
   expires_at: string;
 }
 
+export interface ProfileSummary {
+  id: string;
+  username: string;
+  display_name: string | null;
+  avatar_url: string | null;
+}
+
 export interface StoryGroup {
-  user: { id: string; username: string; display_name: string | null; avatar_url: string | null };
+  user: ProfileSummary;
   stories: Story[];
   allViewed: boolean;
 }
 
+export interface StoryViewer {
+  viewer_id: string;
+  viewed_at: string;
+  profiles: ProfileSummary | null;
+}
+
 const VIEWED_STORAGE_KEY = 'voiceid_viewed_story_ids';
+
+const UNKNOWN_PROFILE = (id: string): ProfileSummary => ({
+  id,
+  username: 'unknown',
+  display_name: null,
+  avatar_url: null,
+});
+
+/**
+ * Fetches profiles for a set of user ids as a plain query (no PostgREST
+ * embed), returning a Map keyed by id for O(1) lookup during merge.
+ *
+ * Intentionally avoids `.select('*, profiles(...)')`-style embeds: those
+ * joins can fail silently for a given role (permission or relationship-
+ * cache issue) — the parent row still comes back, just with the embedded
+ * field as `null` — which previously caused otherwise-valid stories to
+ * vanish from the UI with no visible error. Querying `profiles` directly
+ * surfaces failures explicitly via `error` and keeps story data reachable
+ * even when the profile lookup fails.
+ */
+async function fetchProfilesByIds(ids: string[], context: string): Promise<Map<string, ProfileSummary>> {
+  const byId = new Map<string, ProfileSummary>();
+  if (ids.length === 0) return byId;
+
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('id, username, display_name, avatar_url')
+    .in('id', ids);
+
+  if (error) {
+    console.error(`Failed to load profiles (${context}):`, error);
+    return byId;
+  }
+
+  for (const profile of (data ?? []) as ProfileSummary[]) {
+    byId.set(profile.id, profile);
+  }
+  return byId;
+}
 
 function loadViewedIds(): Set<string> {
   try {
@@ -54,13 +106,6 @@ export function useStories() {
   const refresh = useCallback(async () => {
     setLoading(true);
 
-    // Fetch stories WITHOUT an embedded profiles(...) join. PostgREST embeds
-    // can silently fail for a given role (permission or relationship-cache
-    // issue) — the row still comes back, just with profiles: null — and the
-    // old code's `if (!profile) continue;` meant such stories quietly
-    // vanished with no error and no console warning at all. Fetching stories
-    // and profiles separately and merging in JS avoids that failure mode
-    // entirely: a broken join can no longer hide otherwise-valid stories.
     const { data: storyRows, error: storiesError } = await supabase
       .from('stories')
       .select('*')
@@ -75,56 +120,22 @@ export function useStories() {
       return;
     }
 
-    const rows = (storyRows || []) as any[];
-    const userIds = Array.from(new Set(rows.map(r => r.user_id).filter(Boolean)));
-
-    const profileById = new Map<string, { id: string; username: string; display_name: string | null; avatar_url: string | null }>();
-    if (userIds.length > 0) {
-      const { data: profileRows, error: profilesError } = await supabase
-        .from('profiles')
-        .select('id, username, display_name, avatar_url')
-        .in('id', userIds);
-
-      if (profilesError) {
-        // Don't blank out the whole list just because the profile lookup
-        // failed — log it and fall back to a placeholder below instead.
-        console.error('Failed to load story authors:', profilesError);
-      } else {
-        for (const p of (profileRows || []) as any[]) {
-          profileById.set(p.id, p);
-        }
-      }
-    }
+    const rows: Story[] = storyRows ?? [];
+    const userIds = Array.from(new Set(rows.map(row => row.user_id).filter(Boolean)));
+    const profileById = await fetchProfilesByIds(userIds, 'story authors');
 
     const byUser = new Map<string, StoryGroup>();
     for (const row of rows) {
-      // Fall back to a minimal placeholder profile rather than dropping the
-      // story outright if a profile row is somehow missing.
-      const profile = profileById.get(row.user_id) || {
-        id: row.user_id,
-        username: 'unknown',
-        display_name: null,
-        avatar_url: null,
-      };
-      const existing = byUser.get(profile.id);
-      const story: Story = {
-        id: row.id,
-        user_id: row.user_id,
-        content_type: row.content_type,
-        media_object_key: row.media_object_key,
-        mime_type: row.mime_type,
-        duration: row.duration,
-        text_content: row.text_content,
-        background_color: row.background_color,
-        created_at: row.created_at,
-        expires_at: row.expires_at,
-      };
-      if (existing) {
-        existing.stories.push(story);
+      // Fall back to a placeholder rather than dropping the story outright
+      // if its author's profile is missing or failed to load.
+      const profile = profileById.get(row.user_id) ?? UNKNOWN_PROFILE(row.user_id);
+      const group = byUser.get(profile.id);
+      if (group) {
+        group.stories.push(row);
       } else {
         byUser.set(profile.id, {
-          user: { id: profile.id, username: profile.username, display_name: profile.display_name, avatar_url: profile.avatar_url },
-          stories: [story],
+          user: profile,
+          stories: [row],
           allViewed: false,
         });
       }
@@ -168,35 +179,26 @@ export function useStories() {
     }
   }, [user]);
 
-  const getViewers = useCallback(async (storyId: string) => {
+  const getViewers = useCallback(async (storyId: string): Promise<StoryViewer[]> => {
     const { data: viewRows, error } = await supabase
       .from('story_views')
       .select('viewer_id, viewed_at')
       .eq('story_id', storyId)
       .order('viewed_at', { ascending: false });
+
     if (error) {
       console.error('Failed to load story viewers:', error);
       return [];
     }
-    const rows = viewRows || [];
-    const viewerIds = Array.from(new Set(rows.map(r => r.viewer_id).filter(Boolean)));
-    const profileById = new Map<string, { username: string; display_name: string | null; avatar_url: string | null }>();
-    if (viewerIds.length > 0) {
-      const { data: profileRows, error: profilesError } = await supabase
-        .from('profiles')
-        .select('id, username, display_name, avatar_url')
-        .in('id', viewerIds);
-      if (profilesError) {
-        console.error('Failed to load viewer profiles:', profilesError);
-      } else {
-        for (const p of (profileRows || []) as any[]) {
-          profileById.set(p.id, p);
-        }
-      }
-    }
-    return rows.map(r => ({
-      ...r,
-      profiles: profileById.get(r.viewer_id) || null,
+
+    const rows = viewRows ?? [];
+    const viewerIds = Array.from(new Set(rows.map(row => row.viewer_id).filter(Boolean)));
+    const profileById = await fetchProfilesByIds(viewerIds, 'story viewers');
+
+    return rows.map(row => ({
+      viewer_id: row.viewer_id,
+      viewed_at: row.viewed_at,
+      profiles: profileById.get(row.viewer_id) ?? null,
     }));
   }, []);
 
@@ -226,4 +228,4 @@ export async function uploadStoryMedia(file: Blob, mimeType: string): Promise<st
 
 export function storyMediaUrl(storyId: string): string {
   return `/api/media/story?storyId=${encodeURIComponent(storyId)}`;
-}
+      }
