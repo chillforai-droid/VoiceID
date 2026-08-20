@@ -31,7 +31,7 @@ export default function Hero() {
       >
         <button onClick={() => navigate('/auth/welcome')} className="px-8 py-4 text-base sm:text-lg font-semibold text-white bg-blue-600 rounded-full hover:bg-blue-700 transition">Create VoiceID</button>
         <a
-          href="https://github.com/chillforai-droid/VoiceID-V1/releases/latest/download/app-release.apk"
+          href="https://github.com/chillforai-droid/VoiceID/releases/download/v1.0.0/VoiceID.apk"
           className="px-8 py-4 text-base sm:text-lg font-semibold text-blue-600 bg-white border-2 border-blue-600 rounded-full hover:bg-blue-50 transition inline-flex items-center gap-2"
         >
           Download Android App
