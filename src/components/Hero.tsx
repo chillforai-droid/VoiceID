@@ -27,9 +27,15 @@ export default function Hero() {
         initial={{ y: 20, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         transition={{ delay: 0.3 }}
-        className="flex gap-4 justify-center"
+        className="flex flex-wrap gap-4 justify-center"
       >
         <button onClick={() => navigate('/auth/welcome')} className="px-8 py-4 text-base sm:text-lg font-semibold text-white bg-blue-600 rounded-full hover:bg-blue-700 transition">Create VoiceID</button>
+        <a
+          href="https://github.com/chillforai-droid/VoiceID-V1/releases/latest/download/app-release.apk"
+          className="px-8 py-4 text-base sm:text-lg font-semibold text-blue-600 bg-white border-2 border-blue-600 rounded-full hover:bg-blue-50 transition inline-flex items-center gap-2"
+        >
+          Download Android App
+        </a>
       </motion.div>
       
       <motion.div

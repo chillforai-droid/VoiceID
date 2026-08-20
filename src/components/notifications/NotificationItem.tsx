@@ -76,7 +76,7 @@ function NotificationItemImpl({ notification, onOpen, onDelete, compact, onAccep
         <button
           onClick={(e) => { e.stopPropagation(); onDelete(notification.id); }}
           aria-label="Delete notification"
-          className="shrink-0 min-w-[36px] min-h-[36px] flex items-center justify-center rounded-full text-gray-300 hover:text-red-500 hover:bg-red-50 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
+          className="shrink-0 min-w-[36px] min-h-[36px] flex items-center justify-center rounded-full text-gray-400 hover:text-red-500 hover:bg-red-50 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 focus-visible:opacity-100 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
         >
           <X size={16} />
         </button>

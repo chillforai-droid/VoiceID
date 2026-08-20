@@ -26,6 +26,7 @@ export default function Footer() {
             <li><a href="/#security" className="hover:text-black">Security</a></li>
             <li><Link to="/privacy" className="hover:text-black">Privacy</Link></li>
             <li><Link to="/help" className="hover:text-black">Help Center</Link></li>
+            <li><a href="https://github.com/chillforai-droid/VoiceID-V1/releases/latest/download/app-release.apk" className="hover:text-black">Download Android App</a></li>
           </ul>
         </nav>
         <nav aria-label="Company">
