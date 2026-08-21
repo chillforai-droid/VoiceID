@@ -1,9 +1,9 @@
 {
   "id": "task-1787304792410-db880f",
   "title": "Hii",
-  "status": "pending",
+  "status": "in_progress",
   "createdAt": "2026-08-21T09:33:12.410Z",
-  "startedAt": null,
+  "startedAt": "2026-08-21T09:33:19.163Z",
   "completedAt": null,
   "result": null,
   "error": null,
