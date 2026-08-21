@@ -1,0 +1,20 @@
+{
+  "id": "task-1787304108299-26171e",
+  "title": "VoiceID repository inspect करो और सबसे जरूरी technical problems पहचानो। अभी code change मत करो; detailed report दो।",
+  "status": "pending",
+  "createdAt": "2026-08-21T09:21:48.299Z",
+  "updatedAt": "2026-08-21T09:21:48.299Z",
+  "startedAt": null,
+  "completedAt": null,
+  "result": null,
+  "error": null,
+  "repositoryCommit": null,
+  "memoryFiles": [],
+  "logs": [
+    {
+      "at": "2026-08-21T09:21:48.299Z",
+      "level": "info",
+      "message": "Task created."
+    }
+  ]
+}
