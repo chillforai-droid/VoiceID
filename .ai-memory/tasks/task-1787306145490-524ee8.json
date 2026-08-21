@@ -1,9 +1,9 @@
 {
   "id": "task-1787306145490-524ee8",
   "title": "VoiceID repository inspect करो और सबसे जरूरी technical problems पहचानो। अभी code change मत करो; report दो।",
-  "status": "pending",
+  "status": "in_progress",
   "createdAt": "2026-08-21T09:55:45.494Z",
-  "startedAt": null,
+  "startedAt": "2026-08-21T09:55:50.488Z",
   "completedAt": null,
   "result": null,
   "error": null,
