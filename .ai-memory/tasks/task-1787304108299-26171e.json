@@ -1,15 +1,18 @@
 {
   "id": "task-1787304108299-26171e",
   "title": "VoiceID repository inspect करो और सबसे जरूरी technical problems पहचानो। अभी code change मत करो; detailed report दो।",
-  "status": "in_progress",
+  "status": "failed",
   "createdAt": "2026-08-21T09:21:48.299Z",
-  "updatedAt": "2026-08-21T09:21:52.443Z",
+  "updatedAt": "2026-08-21T09:22:38.028Z",
   "startedAt": "2026-08-21T09:21:52.443Z",
-  "completedAt": null,
+  "completedAt": "2026-08-21T09:22:36.507Z",
   "result": null,
-  "error": null,
+  "error": "OpenClaw agent failed with exit code 1\nToo many arguments for this command.\nTry: openclaw agent exec --help\n",
   "repositoryCommit": null,
-  "memoryFiles": [],
+  "memoryFiles": [
+    ".ai-memory/sessions/2026-08-21T09-21-53-297Z-task-start.json",
+    ".ai-memory/sessions/2026-08-21T09-22-36-507Z-task-failed.json"
+  ],
   "logs": [
     {
       "at": "2026-08-21T09:21:48.299Z",
@@ -20,6 +23,71 @@
       "at": "2026-08-21T09:21:52.443Z",
       "level": "info",
       "message": "Task accepted by agent worker."
+    },
+    {
+      "at": "2026-08-21T09:21:55.022Z",
+      "level": "info",
+      "message": "Cloning GitHub repository..."
+    },
+    {
+      "at": "2026-08-21T09:21:55.022Z",
+      "level": "command",
+      "message": "Git clone: git clone --depth 1 --branch main https://x-access-token:[REDACTED_GITHUB_TOKEN]@github.com/chillforai-droid/VoiceID.git /tmp/voiceid-jobs/task-1787304108299-26171e"
+    },
+    {
+      "at": "2026-08-21T09:21:55.030Z",
+      "level": "stderr",
+      "message": "Cloning into '/tmp/voiceid-jobs/task-1787304108299-26171e'..."
+    },
+    {
+      "at": "2026-08-21T09:21:56.210Z",
+      "level": "command",
+      "message": "Git config: git config user.name VoiceID OpenClaw Agent"
+    },
+    {
+      "at": "2026-08-21T09:21:56.301Z",
+      "level": "command",
+      "message": "Git config: git config user.email voiceid-agent@users.noreply.github.com"
+    },
+    {
+      "at": "2026-08-21T09:21:56.305Z",
+      "level": "success",
+      "message": "Repository cloned and ready."
+    },
+    {
+      "at": "2026-08-21T09:22:16.499Z",
+      "level": "warn",
+      "message": "This OpenClaw CLI does not list --cwd; using the process working directory instead."
+    },
+    {
+      "at": "2026-08-21T09:22:16.499Z",
+      "level": "info",
+      "message": "Starting OpenClaw with model: google/gemini-3.1-flash-lite"
+    },
+    {
+      "at": "2026-08-21T09:22:16.499Z",
+      "level": "info",
+      "message": "AI is now analyzing the repository and working on the task."
+    },
+    {
+      "at": "2026-08-21T09:22:16.499Z",
+      "level": "command",
+      "message": "OpenClaw agent: /app/node_modules/.bin/openclaw agent exec --message-file /tmp/voiceid-jobs/task-1787304108299-26171e/.openclaw-task.md --model google/gemini-3.1-flash-lite --timeout 900 --json"
+    },
+    {
+      "at": "2026-08-21T09:22:36.210Z",
+      "level": "stderr",
+      "message": "Too many arguments for this command."
+    },
+    {
+      "at": "2026-08-21T09:22:36.210Z",
+      "level": "stderr",
+      "message": "Try: openclaw agent exec --help"
+    },
+    {
+      "at": "2026-08-21T09:22:36.507Z",
+      "level": "error",
+      "message": "OpenClaw agent failed with exit code 1\nToo many arguments for this command.\nTry: openclaw agent exec --help\n"
     }
   ]
 }
