@@ -6,7 +6,7 @@
   "startedAt": "2026-08-21T09:06:44.904Z",
   "completedAt": null,
   "result": null,
-  "error": "This task is already running.",
+  "error": "Command failed: ./node_modules/.bin/openclaw agent exec --message-file /tmp/openclaw-task.txt --cwd /tmp/voiceid-work --model google/gemini-3.1-flash-lite --json\nOpenClaw does not recognize option \"--cwd\".\nTry: openclaw agent exec --help\n",
   "repositoryCommit": null,
   "memoryFiles": []
 }
