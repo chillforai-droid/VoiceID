@@ -1,0 +1,94 @@
+{
+  "type": "task-failed",
+  "createdAt": "2026-08-22T06:03:25.892Z",
+  "taskId": "task-1787378572027-f330fd",
+  "title": "Hii",
+  "error": "Command failed with exit code 1\nToo many arguments for this command.\nTry: openclaw agent exec --help\n",
+  "logs": [
+    {
+      "at": "2026-08-22T06:02:56.770Z",
+      "level": "info",
+      "message": "Task accepted by agent worker."
+    },
+    {
+      "at": "2026-08-22T06:02:59.323Z",
+      "level": "info",
+      "message": "Cloning GitHub repository..."
+    },
+    {
+      "at": "2026-08-22T06:02:59.324Z",
+      "level": "command",
+      "message": "git clone --depth 1 --branch main https://x-access-token:[REDACTED_GITHUB_TOKEN]@github.com/chillforai-droid/VoiceID.git /tmp/voiceid-jobs/task-1787378572027-f330fd-1787378579323"
+    },
+    {
+      "at": "2026-08-22T06:02:59.333Z",
+      "level": "stderr",
+      "message": "Cloning into '/tmp/voiceid-jobs/task-1787378572027-f330fd-1787378579323'..."
+    },
+    {
+      "at": "2026-08-22T06:03:01.047Z",
+      "level": "command",
+      "message": "git config user.name VoiceID OpenClaw Agent"
+    },
+    {
+      "at": "2026-08-22T06:03:01.052Z",
+      "level": "command",
+      "message": "git config user.email voiceid-agent@users.noreply.github.com"
+    },
+    {
+      "at": "2026-08-22T06:03:01.144Z",
+      "level": "success",
+      "message": "Repository cloned and ready."
+    },
+    {
+      "at": "2026-08-22T06:03:01.146Z",
+      "level": "info",
+      "message": "Using compatibility mode for the installed OpenClaw CLI."
+    },
+    {
+      "at": "2026-08-22T06:03:01.146Z",
+      "level": "info",
+      "message": "Working directory: /tmp/voiceid-jobs/task-1787378572027-f330fd-1787378579323"
+    },
+    {
+      "at": "2026-08-22T06:03:01.146Z",
+      "level": "info",
+      "message": "Configured model: google/gemini-3.1-flash-lite"
+    },
+    {
+      "at": "2026-08-22T06:03:01.146Z",
+      "level": "info",
+      "message": "Starting OpenClaw agent. Live stdout/stderr will appear in the Agent Shell."
+    },
+    {
+      "at": "2026-08-22T06:03:01.146Z",
+      "level": "info",
+      "message": "AI is now analyzing the repository and working on the task."
+    },
+    {
+      "at": "2026-08-22T06:03:01.146Z",
+      "level": "command",
+      "message": "/app/node_modules/.bin/openclaw agent exec You are the MAIN autonomous OpenClaw coding agent for the private VoiceID project.\n\nYou are running inside the cloned repository. Inspect the real files before acting.\n\nMEMORY INDEX:\n{\n  \"version\": 1,\n  \"website\": \"VoiceID\",\n  \"currentGoal\": \"Improve VoiceID through legitimate product, technical, SEO and content improvements\",\n  \"currentTaskId\": \"task-1787378572027-f330fd\",\n  \"lastMemoryFile\": \".ai-memory/sessions/2026-08-22T06-02-57-808Z-task-start.json\",\n  \"completedTaskIds\": [],\n  \"pendingTaskIds\": [\n    \"task-1787303196312-4d8acc\",\n    \"task-1787303409908-96ad16\",\n    \"task-1787304108299-26171e\",\n    \"task-1787304638689-9786cf\",\n    \"task-1787304739299-e39f63\",\n    \"task-1787304792410-db880f\",\n    \"task-1787306145490-524ee8\",\n    \"task-1787378572027-f330fd\"\n  ],\n  \"importantMemoryFiles\": [],\n  \"lastUpdated\": \"2026-08-22T06:02:58.582Z\"\n}\n\nTASK:\nHii\n\nRULES:\n1. Inspect first; do not invent architecture.\n2. Make only relevant, minimal, production-quality changes.\n3. Preserve existing functionality unless required otherwise.\n4. Never expose secrets.\n5. Do not use fake traffic, spam, fake backlinks, deceptive SEO, or illegal activity.\n6. Run the most appropriate available checks after changes.\n7. Actually perform the work in the workspace; do not merely describe code.\n8. Finish with summary, files changed, checks run, remaining risks, and next step."
+    },
+    {
+      "at": "2026-08-22T06:03:24.248Z",
+      "level": "stderr",
+      "message": "Too many arguments for this command."
+    },
+    {
+      "at": "2026-08-22T06:03:24.248Z",
+      "level": "stderr",
+      "message": "Try: openclaw agent exec --help"
+    },
+    {
+      "at": "2026-08-22T06:03:25.658Z",
+      "level": "error",
+      "message": "OpenClaw agent failed: Command failed with exit code 1\nToo many arguments for this command.\nTry: openclaw agent exec --help\n"
+    },
+    {
+      "at": "2026-08-22T06:03:25.892Z",
+      "level": "error",
+      "message": "Task failed: Command failed with exit code 1\nToo many arguments for this command.\nTry: openclaw agent exec --help\n"
+    }
+  ]
+}
