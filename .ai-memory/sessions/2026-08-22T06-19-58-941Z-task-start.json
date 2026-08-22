@@ -1,0 +1,7 @@
+{
+  "type": "task-start",
+  "createdAt": "2026-08-22T06:19:58.941Z",
+  "taskId": "task-1787379591657-20f718",
+  "title": "Repository के available tests, typecheck, lint या build commands पहचानो और relevant checks चलाकर failures को safely fix करो।",
+  "status": "in_progress"
+}
