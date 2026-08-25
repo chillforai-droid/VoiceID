@@ -4,8 +4,10 @@ import { VoiceAudioCache } from '../../lib/VoiceAudioCache';
 import { MediaCache } from '../../lib/MediaCache';
 import { supabase } from '../../lib/supabase';
 import { downloadMedia, fetchAndCacheMedia } from '../../lib/mediaDownload';
+import { useAuth } from '../../context/AuthContext';
 
 function VoiceMessageImpl({ message }: { message: any }) {
+  const { user } = useAuth();
   const [isPlaying, setIsPlaying] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -75,6 +77,17 @@ function VoiceMessageImpl({ message }: { message: any }) {
       audio.onended = () => setIsPlaying(false);
       await audio.play();
       setIsPlaying(true);
+
+      // Fires the blue-double-tick for the sender: this recipient has now
+      // actually listened to it, not just received it. Only the recipient
+      // (never the sender replaying their own note) is allowed to ack this
+      // — the RPC also enforces that server-side.
+      if (user && message.sender_id !== user.id) {
+        supabase.rpc('acknowledge_voice_played', { p_message_id: message.id })
+          .then(({ error: ackError }: { error: any }) => {
+            if (ackError) console.error('VoiceMessage: acknowledge_voice_played failed', ackError);
+          });
+      }
     } catch (err) {
       console.error('VoiceMessage: failed to play audio', err);
       setError('Failed to load voice message.');

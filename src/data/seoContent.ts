@@ -643,8 +643,77 @@ export const faqCategories: FaqCategory[] = [
         "a": "No, your contacts simply need a VoiceID username to reach you — no phone number changes required."
       }
     ]
+  },
+  {
+    "category": "Security",
+    "page": "/security",
+    "items": [
+      {
+        "q": "How does VoiceID protect my messages?",
+        "a": "Every text message, voice note, and call on VoiceID is protected with end-to-end encryption, so only the sender and recipient can read or hear the content."
+      },
+      {
+        "q": "Can VoiceID employees read my conversations?",
+        "a": "No. VoiceID is built on a zero-knowledge architecture — message content isn't accessible to VoiceID staff or infrastructure."
+      },
+      {
+        "q": "Does VoiceID protect against SIM-swap attacks?",
+        "a": "Yes. Because your VoiceID identity is a username rather than a phone number, SIM-swap-based account takeover isn't possible the way it is on SMS or number-based apps."
+      },
+      {
+        "q": "How does VoiceID handle spam and unwanted contact requests?",
+        "a": "You control who can send you contact requests — from everyone, to contacts of contacts, to nobody — and can block any user at any time."
+      },
+      {
+        "q": "Is my data encrypted in transit and at rest?",
+        "a": "Yes. Messages and media are encrypted in transit, and stored media is held in access-controlled storage separate from the message content itself."
+      },
+      {
+        "q": "What happens to voice messages after they're played?",
+        "a": "Voice messages follow a limited-retention lifecycle after delivery, rather than being stored indefinitely on VoiceID's servers."
+      },
+      {
+        "q": "Can I delete my account and data entirely?",
+        "a": "Yes, account deletion is available from Settings and permanently removes your profile, messages, and conversation history."
+      },
+      {
+        "q": "Does VoiceID share my data with advertisers?",
+        "a": "VoiceID's business model isn't built on selling user data or profiling users for advertisers."
+      }
+    ]
+  },
+  {
+    "category": "About",
+    "page": "/about",
+    "items": [
+      {
+        "q": "What is VoiceID?",
+        "a": "VoiceID is a secure messaging platform that lets you chat, send voice notes, and make calls using a username-based identity instead of your phone number."
+      },
+      {
+        "q": "Why did VoiceID replace phone numbers with usernames?",
+        "a": "Phone numbers are tied to your real identity and carrier, making them a target for spam, SIM-swap attacks, and tracking. A VoiceID username lets you communicate without exposing that identity."
+      },
+      {
+        "q": "Is VoiceID free to use?",
+        "a": "Yes, personal VoiceID accounts are free to create and use."
+      },
+      {
+        "q": "What platforms does VoiceID run on?",
+        "a": "VoiceID runs directly in the browser as a web app — no install required — and can be added to your home screen for an app-like experience."
+      },
+      {
+        "q": "Who is VoiceID built for?",
+        "a": "Anyone who wants private, secure communication without handing over their phone number — individuals, remote teams, and anyone privacy-conscious."
+      },
+      {
+        "q": "How can I get in touch with the VoiceID team?",
+        "a": "You can reach out through the Contact page, or careers@voiceid.example for job-related inquiries."
+      }
+    ]
   }
 ];
+
 
 /** Full 100-item blog content backlog, grouped into the 6 topic clusters
  * requested for VoiceID's SEO strategy. A subset of these are published as

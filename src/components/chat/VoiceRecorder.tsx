@@ -1,17 +1,29 @@
 import { useState, useRef, useEffect } from 'react';
-import { Mic, StopCircle, Send, X, Play } from 'lucide-react';
+import { Mic, StopCircle, Send, X, Play, Pause, Loader2 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useParams } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { MediaCache } from '../../lib/MediaCache';
 
-export function VoiceRecorder({ onSent, onAudioPreview }: { onSent: () => void, onAudioPreview?: (isPreview: boolean) => void }) {
+function formatDuration(totalSeconds: number) {
+  const m = Math.floor(totalSeconds / 60);
+  const s = totalSeconds % 60;
+  return `${m}:${s.toString().padStart(2, '0')}`;
+}
+
+export function VoiceRecorder({ onMessageSent, onBusyChange }: { onMessageSent: (message: any) => void, onBusyChange?: (busy: boolean) => void }) {
   const { id } = useParams();
   const { user } = useAuth();
   const [isRecording, setIsRecording] = useState(false);
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [duration, setDuration] = useState(0);
+  const [sending, setSending] = useState(false);
+  const [isPreviewPlaying, setIsPreviewPlaying] = useState(false);
+  // Live mm:ss shown while actively recording, separate from `duration`
+  // (which is only computed once recording stops).
+  const [elapsed, setElapsed] = useState(0);
+  const elapsedTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const chunksRef = useRef<Blob[]>([]);
@@ -22,11 +34,31 @@ export function VoiceRecorder({ onSent, onAudioPreview }: { onSent: () => void, 
   const previewUrlRef = useRef<string | null>(null);
   const previewAudioRef = useRef<HTMLAudioElement | null>(null);
 
+  // The composer takes over its whole row while recording or previewing a
+  // take, same idea as WhatsApp/Telegram — otherwise the attach-image
+  // button and a disabled text input sat cluttered right next to the
+  // recorder controls the whole time.
   useEffect(() => {
-    if (onAudioPreview) {
-      onAudioPreview(!!audioBlob);
+    onBusyChange?.(isRecording || !!audioBlob);
+  }, [isRecording, audioBlob, onBusyChange]);
+
+  useEffect(() => {
+    if (isRecording) {
+      setElapsed(0);
+      elapsedTimerRef.current = setInterval(() => {
+        setElapsed(Math.min(120, Math.round((Date.now() - startTimeRef.current) / 1000)));
+      }, 1000);
+    } else if (elapsedTimerRef.current) {
+      clearInterval(elapsedTimerRef.current);
+      elapsedTimerRef.current = null;
     }
-  }, [audioBlob, onAudioPreview]);
+    return () => {
+      if (elapsedTimerRef.current) {
+        clearInterval(elapsedTimerRef.current);
+        elapsedTimerRef.current = null;
+      }
+    };
+  }, [isRecording]);
 
   useEffect(() => {
     return () => {
@@ -135,14 +167,21 @@ export function VoiceRecorder({ onSent, onAudioPreview }: { onSent: () => void, 
 
   const playPreview = () => {
     if (!audioBlob) return;
+    if (isPreviewPlaying) {
+      previewAudioRef.current?.pause();
+      setIsPreviewPlaying(false);
+      return;
+    }
     if (!previewUrlRef.current) {
       previewUrlRef.current = URL.createObjectURL(audioBlob);
     }
     if (!previewAudioRef.current) {
       previewAudioRef.current = new Audio(previewUrlRef.current);
+      previewAudioRef.current.onended = () => setIsPreviewPlaying(false);
     }
     previewAudioRef.current.currentTime = 0;
     previewAudioRef.current.play();
+    setIsPreviewPlaying(true);
   };
 
   const discardPreview = () => {
@@ -152,6 +191,7 @@ export function VoiceRecorder({ onSent, onAudioPreview }: { onSent: () => void, 
       previewUrlRef.current = null;
     }
     previewAudioRef.current = null;
+    setIsPreviewPlaying(false);
     setAudioBlob(null);
   };
 
@@ -170,127 +210,162 @@ export function VoiceRecorder({ onSent, onAudioPreview }: { onSent: () => void, 
     }
 
     setError(null);
+    setSending(true);
 
-    // 1. Calculate Hash
-    let sha256: string;
     try {
-      const arrayBuffer = await audioBlob.arrayBuffer();
-      const hashBuffer = await crypto.subtle.digest('SHA-256', arrayBuffer);
-      const hashArray = Array.from(new Uint8Array(hashBuffer));
-      sha256 = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-    } catch (err: any) {
-      setError('Failed to process recording.');
-      return;
-    }
-
-    const session = await supabase.auth.getSession();
-    const token = session.data.session?.access_token;
-
-    // 2. Upload via the server-side proxy: /api/media/upload
-    // (Same endpoint used by image upload in ChatPage.tsx. The server holds
-    // the authenticated S3 client and uploads to B2 itself, so the browser
-    // never needs to talk to B2 directly.)
-    const uploadUrl = "/api/media/upload";
-    let objectKey: string;
-    try {
-      const uploadRes = await fetch(uploadUrl, {
-        method: "POST",
-        headers: {
-          "Content-Type": audioBlob.type,
-          "Authorization": `Bearer ${token}`
-        },
-        body: audioBlob,
-      });
-
-      if (!uploadRes.ok) {
-        setError('Failed to upload audio.');
+      // 1. Calculate Hash
+      let sha256: string;
+      try {
+        const arrayBuffer = await audioBlob.arrayBuffer();
+        const hashBuffer = await crypto.subtle.digest('SHA-256', arrayBuffer);
+        const hashArray = Array.from(new Uint8Array(hashBuffer));
+        sha256 = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+      } catch (err: any) {
+        setError('Failed to process recording.');
         return;
       }
 
-      const json = await uploadRes.json();
-      objectKey = json.objectKey;
+      const session = await supabase.auth.getSession();
+      const token = session.data.session?.access_token;
 
-      if (!objectKey) {
-        setError('Failed to upload audio.');
-        return;
-      }
-    } catch (err: any) {
-      setError(`Failed to send voice message: ${err?.message || 'Unknown error'}`);
-      return;
-    }
+      // 2. Upload via the server-side proxy: /api/media/upload
+      // (Same endpoint used by image upload in ChatPage.tsx. The server holds
+      // the authenticated S3 client and uploads to B2 itself, so the browser
+      // never needs to talk to B2 directly.)
+      const uploadUrl = "/api/media/upload";
+      let objectKey: string;
+      try {
+        const uploadRes = await fetch(uploadUrl, {
+          method: "POST",
+          headers: {
+            "Content-Type": audioBlob.type,
+            "Authorization": `Bearer ${token}`
+          },
+          body: audioBlob,
+        });
 
-    // 3. Insert metadata
-    const messageId = crypto.randomUUID();
-    try {
-      const { error: dbError } = await supabase.from('messages').insert({
-          id: messageId,
-          conversation_id: id,
-          sender_id: user.id,
-          content_body: '',
-          content_type: 'voice',
-          b2_object_key: objectKey,
-          sha256: sha256,
-          media_status: 'pending',
-          duration: duration,
-          mime_type: audioBlob.type,
-          byte_size: audioBlob.size
-      });
-
-      if (dbError) {
-          setError('Failed to save message.');
+        if (!uploadRes.ok) {
+          setError('Failed to upload audio.');
           return;
+        }
+
+        const json = await uploadRes.json();
+        objectKey = json.objectKey;
+
+        if (!objectKey) {
+          setError('Failed to upload audio.');
+          return;
+        }
+      } catch (err: any) {
+        setError(`Failed to send voice message: ${err?.message || 'Unknown error'}`);
+        return;
       }
-    } catch (err: any) {
-      setError(`Failed to send voice message: ${err?.message || 'Unknown error'}`);
-      return;
-    }
 
-    try {
-      await MediaCache.putMedia({
-          messageId: messageId,
-          mediaType: 'voice',
-          blob: audioBlob,
-          mimeType: audioBlob.type,
-          byteSize: audioBlob.size,
-          createdAt: Date.now(),
-          sha256: sha256,
-          deliveryStatus: 'pending'
+      // 3. Insert metadata
+      const messageId = crypto.randomUUID();
+      try {
+        const { error: dbError } = await supabase.from('messages').insert({
+            id: messageId,
+            conversation_id: id,
+            sender_id: user.id,
+            content_body: '',
+            content_type: 'voice',
+            b2_object_key: objectKey,
+            sha256: sha256,
+            media_status: 'pending',
+            duration: duration,
+            mime_type: audioBlob.type,
+            byte_size: audioBlob.size
+        });
+
+        if (dbError) {
+            setError('Failed to save message.');
+            return;
+        }
+      } catch (err: any) {
+        setError(`Failed to send voice message: ${err?.message || 'Unknown error'}`);
+        return;
+      }
+
+      try {
+        await MediaCache.putMedia({
+            messageId: messageId,
+            mediaType: 'voice',
+            blob: audioBlob,
+            mimeType: audioBlob.type,
+            byteSize: audioBlob.size,
+            createdAt: Date.now(),
+            sha256: sha256,
+            deliveryStatus: 'pending'
+        });
+      } catch (err: any) {
+        // Non-fatal: the message is already saved server-side, so don't block on local cache failure.
+      }
+
+      // Hand the finished message straight to ChatPage so it appears in the
+      // list immediately — same reasoning as the image optimistic-append:
+      // waiting for the realtime INSERT to round-trip back left the bubble
+      // (and its "sending" animation) invisible for a beat after tapping Send.
+      onMessageSent({
+        id: messageId,
+        conversation_id: id,
+        sender_id: user.id,
+        content_body: '',
+        content_type: 'voice',
+        b2_object_key: objectKey,
+        sha256,
+        media_status: 'pending',
+        duration,
+        mime_type: audioBlob.type,
+        byte_size: audioBlob.size,
+        created_at: new Date().toISOString(),
       });
-    } catch (err: any) {
-      // Non-fatal: the message is already saved server-side, so don't block on local cache failure.
-    }
 
-    if (previewUrlRef.current) {
-      URL.revokeObjectURL(previewUrlRef.current);
-      previewUrlRef.current = null;
+      if (previewUrlRef.current) {
+        URL.revokeObjectURL(previewUrlRef.current);
+        previewUrlRef.current = null;
+      }
+      previewAudioRef.current = null;
+      setIsPreviewPlaying(false);
+      setAudioBlob(null);
+    } finally {
+      setSending(false);
     }
-    previewAudioRef.current = null;
-    setAudioBlob(null);
-    onSent();
   };
 
   return (
-    <div className="flex flex-col gap-2 min-w-0">
-      {error && <p className="text-red-500 text-xs sm:text-sm break-words max-w-[60vw] sm:max-w-xs">{error}</p>}
-      <div className="flex items-center gap-2">
+    <div className="flex flex-col gap-2 min-w-0 flex-1">
+      {error && <p className="text-red-500 text-xs sm:text-sm break-words">{error}</p>}
+      <div className="flex items-center gap-3">
         {audioBlob ? (
           <>
-            <button type="button" onClick={discardPreview} className="p-3 text-gray-500 hover:bg-gray-100 rounded-full"><X size={20} /></button>
-            <button type="button" onClick={playPreview} className="p-3 bg-gray-100 text-gray-700 rounded-full"><Play size={20} /></button>
+            <button type="button" onClick={discardPreview} disabled={sending} className="p-3 text-gray-500 hover:bg-gray-100 rounded-full shrink-0 disabled:opacity-50" aria-label="Discard recording"><X size={20} /></button>
+            <button type="button" onClick={playPreview} className="p-3 bg-gray-100 text-gray-700 rounded-full shrink-0" aria-label={isPreviewPlaying ? 'Pause preview' : 'Play preview'}>
+              {isPreviewPlaying ? <Pause size={20} /> : <Play size={20} />}
+            </button>
+            <span className="text-sm font-medium text-gray-600 tabular-nums flex-1">{formatDuration(duration)}</span>
             <button
               type="button"
               onClick={() => sendAudio()}
-              className="p-3 bg-blue-600 text-white rounded-full"
+              disabled={sending}
+              className="p-3 bg-blue-600 text-white rounded-full shrink-0 disabled:opacity-60"
+              aria-label="Send voice message"
             >
-              <Send size={20} />
+              {sending ? <Loader2 size={20} className="animate-spin" /> : <Send size={20} />}
             </button>
           </>
         ) : isRecording ? (
-          <button type="button" onClick={stopRecording} className="p-3 bg-red-500 text-white rounded-full animate-pulse"><StopCircle size={20} /></button>
+          <>
+            <button type="button" onClick={stopRecording} className="p-3 bg-red-500 text-white rounded-full shrink-0 animate-pulse animate-recording-ring" aria-label="Stop recording"><StopCircle size={20} /></button>
+            <span className="flex items-center gap-1.5 text-sm font-medium text-red-500 tabular-nums">
+              <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+              {formatDuration(elapsed)}
+            </span>
+          </>
         ) : (
-          <button type="button" onClick={startRecording} className="p-3 bg-gray-100 text-gray-600 hover:bg-gray-200 rounded-full"><Mic size={20} /></button>
+          <button type="button" onClick={startRecording} className="p-3 bg-gray-100 text-gray-600 hover:bg-gray-200 rounded-full shrink-0" aria-label="Record voice message"><Mic size={20} /></button>
         )}
       </div>
     </div>
   );
-        }
+}

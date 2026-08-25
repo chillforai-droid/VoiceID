@@ -23,7 +23,7 @@ export default function Footer() {
           <h4 className="font-bold mb-4">Product</h4>
           <ul className="space-y-2 text-sm text-gray-500">
             <li><Link to="/features" className="hover:text-black">Features</Link></li>
-            <li><a href="/#security" className="hover:text-black">Security</a></li>
+            <li><Link to="/security" className="hover:text-black">Security</Link></li>
             <li><Link to="/privacy" className="hover:text-black">Privacy</Link></li>
             <li><Link to="/help" className="hover:text-black">Help Center</Link></li>
             <li><a href="https://github.com/chillforai-droid/VoiceID/releases/download/v1.0.0/VoiceID.apk" className="hover:text-black">Download Android App</a></li>
@@ -32,7 +32,7 @@ export default function Footer() {
         <nav aria-label="Company">
           <h4 className="font-bold mb-4">Company</h4>
           <ul className="space-y-2 text-sm text-gray-500">
-            <li><a href="/#about" className="hover:text-black">About</a></li>
+            <li><Link to="/about" className="hover:text-black">About</Link></li>
             <li><Link to="/careers" className="hover:text-black">Careers</Link></li>
             <li><Link to="/blog" className="hover:text-black">VoiceID Blog</Link></li>
           </ul>

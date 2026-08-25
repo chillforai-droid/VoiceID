@@ -21,14 +21,22 @@ export default function ChatPage() {
   const { initiateCall, canCallUser } = useVoiceCall();
   const { isUserOnline } = usePresence();
   const [messages, setMessages] = useState<any[]>([]);
+  // Per-message delivered/read state for messages *we* sent, keyed by
+  // message id — drives the single/double/blue-double tick in
+  // MessageBubble. Populated from an initial fetch plus a realtime
+  // subscription to message_receipts (see the channel setup below).
+  const [receipts, setReceipts] = useState<Record<string, { delivered_at: string | null; read_at: string | null }>>({});
+  // Guards against re-firing the mark-read/mark-delivered RPC for a message
+  // we've already acknowledged in this session (the messages array can
+  // re-render for unrelated reasons — edits, other realtime events).
+  const acknowledgedRef = useRef<Set<string>>(new Set());
   const [editingMessage, setEditingMessage] = useState<any>(null);
   const [editContent, setEditContent] = useState('');
   const [messageToDelete, setMessageToDelete] = useState<any>(null);
   const [selectedMessageId, setSelectedMessageId] = useState<string | null>(null);
   const [newMessage, setNewMessage] = useState('');
   const [messagesLoading, setMessagesLoading] = useState(true);
-  const [isPreviewMode, setIsPreviewMode] = useState(false);
-  const [previewImage, setPreviewImage] = useState<string | null>(null);
+  const [isVoiceComposerBusy, setIsVoiceComposerBusy] = useState(false);
   const [otherUser, setOtherUser] = useState<any>(null);
   const [isNetworkOnline, setIsNetworkOnline] = useState(() => navigator.onLine);
   const [isOtherTyping, setIsOtherTyping] = useState(false);
@@ -117,66 +125,99 @@ export default function ChatPage() {
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !user || !id) return;
-    
+
     // Reset file input
     e.target.value = '';
-    
-    // Set preview (revoking any previous preview URL first so we don't
-    // accumulate Blob URLs across multiple attachments in one session)
-    if (previewImage) URL.revokeObjectURL(previewImage);
-    setPreviewImage(URL.createObjectURL(file));
-    
-    const arrayBuffer = await file.arrayBuffer();
-    const hashBuffer = await crypto.subtle.digest('SHA-256', arrayBuffer);
-    const hashArray = Array.from(new Uint8Array(hashBuffer));
-    const sha256 = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 
-    const session = await supabase.auth.getSession();
-    const token = session.data.session?.access_token;
-    
-    const uploadRes = await fetch("/api/media/upload", {
-      method: "POST",
-      headers: { 
-        "Content-Type": file.type,
-        "Authorization": `Bearer ${token}` 
-      },
-      body: file,
-    });
-    
-    if (!uploadRes.ok) {
+    const messageId = crypto.randomUUID();
+    const localUrl = URL.createObjectURL(file);
+
+    // Optimistic UI: the bubble appears immediately (with the exact bytes
+    // the user picked, via _previewUrl) instead of only after the upload
+    // finishes and the realtime INSERT event round-trips back. This is what
+    // gives the "sending" animation something to animate in right away.
+    const localMessage = {
+      id: messageId,
+      conversation_id: id,
+      sender_id: user.id,
+      content_body: '',
+      content_type: 'image',
+      created_at: new Date().toISOString(),
+      mime_type: file.type,
+      byte_size: file.size,
+      local_pending: true,
+      _previewUrl: localUrl,
+    };
+    setMessages(prev => [...prev, localMessage]);
+
+    const markFailed = () => {
+      setMessages(prev => prev.map(m => m.id === messageId ? { ...m, local_pending: false, local_failed: true } : m));
+    };
+
+    try {
+      const arrayBuffer = await file.arrayBuffer();
+      const hashBuffer = await crypto.subtle.digest('SHA-256', arrayBuffer);
+      const hashArray = Array.from(new Uint8Array(hashBuffer));
+      const sha256 = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+
+      const session = await supabase.auth.getSession();
+      const token = session.data.session?.access_token;
+
+      const uploadRes = await fetch("/api/media/upload", {
+        method: "POST",
+        headers: {
+          "Content-Type": file.type,
+          "Authorization": `Bearer ${token}`
+        },
+        body: file,
+      });
+
+      if (!uploadRes.ok) {
         console.error("handleImageUpload: proxy upload failed", await uploadRes.text());
-        throw new Error("Failed to upload to storage");
-    }
-    
-    const { objectKey } = await uploadRes.json();
-    
-    const { data: message, error: dbError } = await supabase.from('messages').insert({
+        markFailed();
+        return;
+      }
+
+      const { objectKey } = await uploadRes.json();
+
+      const { data: message, error: dbError } = await supabase.from('messages').insert({
+        id: messageId,
         conversation_id: id,
         sender_id: user.id,
         content_body: '',
         content_type: 'image',
         b2_object_key: objectKey,
         sha256: sha256,
-        media_status: 'delivered', // Change to delivered
+        media_status: 'delivered',
         mime_type: file.type,
         byte_size: file.size
-    }).select().single();
-    
-    if (dbError) {
+      }).select().single();
+
+      if (dbError || !message) {
         console.error('Image message insert error:', dbError);
-    } else {
-        // Cache the blob
-        await MediaCache.putMedia({
-            messageId: message.id,
-            mediaType: 'image',
-            blob: file,
-            mimeType: file.type,
-            byteSize: file.size,
-            createdAt: Date.now(),
-            sha256: sha256,
-            deliveryStatus: 'delivered'
-        });
-        setPreviewImage(prev => { if (prev) URL.revokeObjectURL(prev); return null; });
+        markFailed();
+        return;
+      }
+
+      // Cache the blob under the same id used above, so the fetch path
+      // ImageMessage falls back to (once _previewUrl is dropped) hits the
+      // cache instantly instead of downloading what we already have.
+      await MediaCache.putMedia({
+        messageId: message.id,
+        mediaType: 'image',
+        blob: file,
+        mimeType: file.type,
+        byteSize: file.size,
+        createdAt: Date.now(),
+        sha256: sha256,
+        deliveryStatus: 'delivered'
+      });
+
+      setMessages(prev => prev.map(m => m.id === messageId ? message : m));
+      URL.revokeObjectURL(localUrl);
+    } catch (err) {
+      console.error('handleImageUpload: failed', err);
+      markFailed();
     }
   };
 
@@ -238,6 +279,26 @@ export default function ChatPage() {
       if (!cancelled && !error && data) {
         setMessages(data);
         await OfflineMessageStore.cacheConversation(id, data);
+
+        // Pull the current delivered/read state for everything *we* sent,
+        // so ticks are correct immediately on load instead of only after
+        // the next realtime receipt update.
+        const ownMessageIds = data.filter((m: any) => m.sender_id === user.id).map((m: any) => m.id);
+        if (ownMessageIds.length > 0) {
+          const { data: receiptRows } = await supabase
+            .from('message_receipts')
+            .select('message_id, delivered_at, read_at, played_at')
+            .in('message_id', ownMessageIds);
+          if (!cancelled && receiptRows) {
+            setReceipts(prev => {
+              const next = { ...prev };
+              for (const r of receiptRows) {
+                next[r.message_id] = { delivered_at: r.delivered_at, read_at: r.read_at || r.played_at };
+              }
+              return next;
+            });
+          }
+        }
       }
       if (!cancelled) setMessagesLoading(false);
 
@@ -276,6 +337,19 @@ export default function ChatPage() {
         await OfflineMessageStore.deleteMessage(id, payload.old.id);
         setMessages(prev => prev.filter(m => m.id !== payload.old.id));
       })
+      // No conversation_id column to filter on server-side here — RLS
+      // already scopes this to receipts on messages in conversations the
+      // current user belongs to, so this can pick up rows from a
+      // different open conversation too; that's harmless, it just adds an
+      // unused entry to the receipts map.
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'message_receipts' }, (payload) => {
+        const row: any = payload.new || payload.old;
+        if (!row?.message_id) return;
+        setReceipts(prev => ({
+          ...prev,
+          [row.message_id]: { delivered_at: row.delivered_at, read_at: row.read_at || row.played_at },
+        }));
+      })
       .subscribe(() => {
         void flushOutbox();
       });
@@ -300,12 +374,35 @@ export default function ChatPage() {
 
   useEffect(() => { scrollRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
 
-  // Safety net: revoke the attachment preview URL if the user navigates
-  // away mid-upload instead of cancelling or completing it.
+  // This is the fix for "double tick nahi dikhta": the recipient's browser
+  // never told the sender the message had been seen, because nothing in
+  // the app called the mark_message_read / acknowledge_voice_delivery RPCs
+  // that already existed server-side. With the conversation open, every
+  // incoming (not-our-own) message is acknowledged here — text/image via
+  // mark_message_read (delivered+read together, since seeing it in an open
+  // chat means both), voice via the voice-specific delivery RPC (its own
+  // "read"/played receipt is fired separately, from actual playback in
+  // VoiceMessage.tsx, since delivery isn't the same as having listened).
   useEffect(() => {
-    return () => { if (previewImage) URL.revokeObjectURL(previewImage); };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    if (!user || !id) return;
+    const incoming = messages.filter(m => m.sender_id !== user.id && !m.local_pending && !acknowledgedRef.current.has(m.id));
+    if (incoming.length === 0) return;
+    incoming.forEach(m => acknowledgedRef.current.add(m.id));
+    (async () => {
+      for (const m of incoming) {
+        try {
+          if (m.content_type === 'voice') {
+            await supabase.rpc('acknowledge_voice_delivery', { p_message_id: m.id });
+          } else {
+            await supabase.rpc('mark_message_read', { p_message_id: m.id });
+          }
+        } catch (err) {
+          console.error('Failed to acknowledge message receipt', m.id, err);
+          acknowledgedRef.current.delete(m.id);
+        }
+      }
+    })();
+  }, [messages, user, id]);
 
   // Deep link support: notifications for a specific message (e.g. a new
   // message notification) can carry ?m=<messageId> so we scroll straight
@@ -352,6 +449,13 @@ export default function ChatPage() {
     if (navigator.onLine) {
       await flushOutbox();
     }
+  };
+
+  // VoiceRecorder already performed the upload + DB insert; it hands us the
+  // finished row so it can appear (with the entrance animation) right away
+  // instead of waiting on the realtime INSERT event to round-trip back.
+  const handleVoiceMessageSent = (message: any) => {
+    setMessages(prev => prev.find(m => m.id === message.id) ? prev : [...prev, message]);
   };
 
   const deleteMessage = async (m: any) => {
@@ -457,11 +561,15 @@ export default function ChatPage() {
         </div>
       )}
       <div className="flex-1 overflow-y-auto overflow-x-hidden p-3 sm:p-4 space-y-3 sm:space-y-4">
-        {messages.map((m) => (
+        {messages.map((m) => {
+          const receipt = receipts[m.id];
+          const receiptStatus: 'sent' | 'delivered' | 'read' = receipt?.read_at ? 'read' : receipt?.delivered_at ? 'delivered' : 'sent';
+          return (
           <MessageBubble
             key={m.id}
             message={m}
             isOwn={m.sender_id === user?.id}
+            receiptStatus={receiptStatus}
             isHighlighted={highlightedMessageId === m.id}
             isSelected={selectedMessageId === m.id}
             isEditing={editingMessage?.id === m.id}
@@ -473,7 +581,8 @@ export default function ChatPage() {
             onStartEdit={() => { setEditingMessage(m); setEditContent(m.content_body.replace(" (edited)", "")); setSelectedMessageId(null); }}
             onRequestDelete={() => { setMessageToDelete(m); setSelectedMessageId(null); }}
           />
-        ))}
+          );
+        })}
         <div ref={scrollRef} />
       </div>
       
@@ -488,22 +597,15 @@ export default function ChatPage() {
         onCancel={() => setMessageToDelete(null)}
       />
       
-      {previewImage && (
-        <div className="p-2 border-t bg-white flex items-center gap-3">
-          <img src={previewImage} alt="Preview" loading="lazy" decoding="async" className="h-16 w-16 sm:h-20 sm:w-20 rounded object-cover" />
-          <button onClick={() => { URL.revokeObjectURL(previewImage); setPreviewImage(null); }} className="text-sm text-gray-600 hover:text-gray-900 px-3 py-1.5 rounded-full hover:bg-gray-100">Cancel</button>
-        </div>
-      )}
       
       <form onSubmit={sendMessage} className="pb-safe p-2 sm:p-4 bg-white border-t flex gap-1 sm:gap-2 w-full items-center">
-        <>
-        <VoiceRecorder onSent={() => {}} onAudioPreview={(isPreview) => setIsPreviewMode(isPreview)} />
-        <button type="button" onClick={() => fileInputRef.current?.click()} className="p-3 hover:bg-gray-100 rounded-full shrink-0 text-gray-500" aria-label="Attach image">
-            <ImageIcon size={20} />
-        </button>
-        <input type="file" ref={fileInputRef} onChange={handleImageUpload} accept="image/*" className="hidden" />
-        {!isPreviewMode && (
+        <VoiceRecorder onMessageSent={handleVoiceMessageSent} onBusyChange={setIsVoiceComposerBusy} />
+        {!isVoiceComposerBusy && (
           <>
+            <button type="button" onClick={() => fileInputRef.current?.click()} className="p-3 hover:bg-gray-100 rounded-full shrink-0 text-gray-500" aria-label="Attach image">
+                <ImageIcon size={20} />
+            </button>
+            <input type="file" ref={fileInputRef} onChange={handleImageUpload} accept="image/*" className="hidden" />
             <input 
               value={newMessage}
               onChange={(e) => handleTyping(e.target.value)}
@@ -513,7 +615,6 @@ export default function ChatPage() {
             <button type="submit" disabled={!newMessage.trim()} className="p-3 bg-blue-600 text-white rounded-full shrink-0 disabled:opacity-50" aria-label="Send message">{isNetworkOnline ? <Send size={20} /> : <WifiOff size={19} />}</button>
           </>
         )}
-        </>
       </form>
     </div>
   );

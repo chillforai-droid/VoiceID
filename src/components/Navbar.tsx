@@ -19,7 +19,7 @@ export default function Navbar() {
       </a>
       <div className="hidden md:flex gap-8 text-sm font-medium text-gray-600 dark:text-slate-300">
         <a href="/features" className="hover:text-black dark:hover:text-white">Features</a>
-        <a href="#security" className="hover:text-black dark:hover:text-white">Security</a>
+        <a href="/security" className="hover:text-black dark:hover:text-white">Security</a>
         <a href="/blog" className="hover:text-black dark:hover:text-white">Blog</a>
         <a href="/help" className="hover:text-black dark:hover:text-white">Help</a>
       </div>

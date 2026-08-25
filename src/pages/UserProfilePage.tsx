@@ -111,7 +111,7 @@ export default function UserProfilePage() {
       }
   };
 
-  const getProfileShareUrl = () => `${window.location.origin}/u/${profile.username}?ref=${encodeURIComponent(profile.username)}`;
+  const getProfileShareUrl = () => `${window.location.origin}/u/${encodeURIComponent(profile.username)}?ref=${encodeURIComponent(profile.username)}`;
 
   const getProfileShareText = () => {
     const details = [

@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { Loader2, Save, User, Bell, Shield, LogOut, Trash2, Ban, Sun, Moon, Monitor } from 'lucide-react';
 import { Avatar } from '../components/common/Avatar';
 import { useTheme } from '../context/ThemeContext';
+import { ConfirmDialog } from '../components/chat/ConfirmDialog';
 
 export default function SettingsPage() {
   const { user, profile, updateProfile } = useAuth();
@@ -88,6 +89,36 @@ export default function SettingsPage() {
     window.location.href = '/auth/login';
   };
 
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
+
+  const deleteAccount = async () => {
+    setShowDeleteConfirm(false);
+    setDeleting(true);
+    setDeleteError('');
+    try {
+      const session = await supabase.auth.getSession();
+      const token = session.data.session?.access_token;
+      const res = await fetch('/api/delete-account', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.message || 'Failed to delete account.');
+      }
+      // The account (and its Supabase session) no longer exists server-side,
+      // so signOut() here is just local cleanup of the client's stored
+      // session before sending the person to the login screen.
+      await supabase.auth.signOut();
+      window.location.href = '/auth/login';
+    } catch (err: any) {
+      setDeleteError(err.message || 'Failed to delete account.');
+      setDeleting(false);
+    }
+  };
+
   return (
     <div className="max-w-xl mx-auto space-y-6 sm:space-y-8 p-4">
       <h1 className="text-2xl font-bold">Settings</h1>
@@ -168,8 +199,24 @@ export default function SettingsPage() {
       {/* Danger Zone */}
       <div className="p-4 sm:p-6 bg-white border border-red-100 rounded-2xl space-y-4">
         <h2 className="text-lg font-semibold text-red-600 flex items-center gap-2"><Trash2 size={18}/> Danger Zone</h2>
-        <button className="text-red-600 font-semibold flex items-center gap-2">Delete Account</button>
+        <button
+          type="button"
+          onClick={() => setShowDeleteConfirm(true)}
+          disabled={deleting}
+          className="text-red-600 font-semibold flex items-center gap-2 disabled:opacity-50"
+        >
+          {deleting ? <Loader2 className="animate-spin" size={16}/> : <Trash2 size={16} />} Delete Account
+        </button>
+        {deleteError && <p className="text-sm text-red-600">{deleteError}</p>}
       </div>
+
+      <ConfirmDialog
+        isOpen={showDeleteConfirm}
+        title="Delete your account?"
+        message="This permanently deletes your profile, messages, and conversations. This cannot be undone."
+        onConfirm={deleteAccount}
+        onCancel={() => setShowDeleteConfirm(false)}
+      />
 
       <div className="p-4 sm:p-6 bg-white border border-gray-100 rounded-2xl">
         <button onClick={signOut} className="text-red-600 font-semibold flex items-center gap-2"><LogOut size={16}/> Sign Out</button>

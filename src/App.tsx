@@ -31,6 +31,8 @@ const VideoCalls = lazy(() => import('./pages/landing/VideoCalls'));
 const FeaturesPage = lazy(() => import('./pages/landing/FeaturesPage'));
 const HelpPage = lazy(() => import('./pages/landing/HelpPage'));
 const PrivacyLanding = lazy(() => import('./pages/landing/PrivacyLanding'));
+const SecurityPage = lazy(() => import('./pages/landing/SecurityPage'));
+const AboutPage = lazy(() => import('./pages/landing/AboutPage'));
 
 // Auth flow
 const Welcome = lazy(() => import('./components/auth/Welcome'));
@@ -81,6 +83,8 @@ export default function App() {
                   <Route path="/features" element={<FeaturesPage />} />
                   <Route path="/help" element={<HelpPage />} />
                   <Route path="/privacy" element={<PrivacyLanding />} />
+                  <Route path="/security" element={<SecurityPage />} />
+                  <Route path="/about" element={<AboutPage />} />
                   <Route path="/auth/welcome" element={<Welcome />} />
                   <Route path="/auth/signup" element={<SignUp />} />
                   <Route path="/auth/login" element={<Login />} />
