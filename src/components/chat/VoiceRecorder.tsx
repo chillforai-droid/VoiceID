@@ -4,6 +4,7 @@ import { supabase } from '../../lib/supabase';
 import { useParams } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { MediaCache } from '../../lib/MediaCache';
+import { uploadMediaWithRetry } from '../../lib/uploadMediaWithRetry';
 
 function formatDuration(totalSeconds: number) {
   const m = Math.floor(totalSeconds / 60);
@@ -225,39 +226,15 @@ export function VoiceRecorder({ onMessageSent, onBusyChange }: { onMessageSent: 
         return;
       }
 
-      const session = await supabase.auth.getSession();
-      const token = session.data.session?.access_token;
-
-      // 2. Upload via the server-side proxy: /api/media/upload
-      // (Same endpoint used by image upload in ChatPage.tsx. The server holds
-      // the authenticated S3 client and uploads to B2 itself, so the browser
-      // never needs to talk to B2 directly.)
-      const uploadUrl = "/api/media/upload";
+      // 2. Upload via the shared retry-aware upload helper: it checks the
+      // file size upfront, retries transient network failures, and turns
+      // the raw "Failed to fetch" into a message that actually explains
+      // what happened.
       let objectKey: string;
       try {
-        const uploadRes = await fetch(uploadUrl, {
-          method: "POST",
-          headers: {
-            "Content-Type": audioBlob.type,
-            "Authorization": `Bearer ${token}`
-          },
-          body: audioBlob,
-        });
-
-        if (!uploadRes.ok) {
-          setError('Failed to upload audio.');
-          return;
-        }
-
-        const json = await uploadRes.json();
-        objectKey = json.objectKey;
-
-        if (!objectKey) {
-          setError('Failed to upload audio.');
-          return;
-        }
+        objectKey = await uploadMediaWithRetry(audioBlob, audioBlob.type);
       } catch (err: any) {
-        setError(`Failed to send voice message: ${err?.message || 'Unknown error'}`);
+        setError(err?.message || 'Failed to upload audio.');
         return;
       }
 

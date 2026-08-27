@@ -1,8 +1,8 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { CheckCircle2 } from 'lucide-react';
+import { CheckCircle2, Share2, Copy, Check } from 'lucide-react';
 
 // Username shape enforced everywhere a username is written or looked up:
 // lowercase letters, digits, and underscores only, 3-25 characters. This is
@@ -22,6 +22,10 @@ export default function ChooseVoiceID() {
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
   const [headingToChat, setHeadingToChat] = useState(false);
+  const [copied, setCopied] = useState(false);
+  // Where "Continue" / auto-navigate takes the person after the one-time
+  // share screen — computed once inside createProfile, then read here.
+  const destinationRef = useRef('/dashboard');
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const ref = searchParams.get('ref') || (typeof window !== 'undefined' ? window.localStorage.getItem('voiceid_shared_profile_ref') : null);
@@ -115,15 +119,76 @@ export default function ChooseVoiceID() {
 
     setSubmitting(false);
     setSuccess(true);
-    setTimeout(() => navigate(destination), 900);
+    destinationRef.current = destination;
   };
 
   if (success) {
+    // Own profile share link, same shape as UserProfilePage.tsx's
+    // getProfileShareUrl — built directly here since this screen fires
+    // right at signup, before any profile fetch has happened.
+    const shareUrl = `${window.location.origin}/u/${encodeURIComponent(username)}?ref=${encodeURIComponent(username)}`;
+    const shareText = `Chat with me on VoiceID \u2014 no phone number needed. Add me here: ${shareUrl}`;
+
+    const handleShare = async () => {
+      if (typeof navigator !== 'undefined' && (navigator as any).share) {
+        try {
+          await (navigator as any).share({ title: 'Add me on VoiceID', text: shareText, url: shareUrl });
+        } catch {
+          // The person cancelled the native share sheet — not an error, do nothing.
+        }
+        return;
+      }
+      try {
+        await navigator.clipboard.writeText(shareText);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      } catch {
+        // Clipboard blocked (permissions/insecure context) — nothing more
+        // we can silently do here; the person can still copy the link
+        // manually from the visible text below.
+      }
+    };
+
     return (
       <div className="min-h-screen bg-white flex flex-col items-center justify-center px-6 text-center">
         <CheckCircle2 className="text-green-500 mb-4" size={48} />
         <h1 className="text-2xl font-bold mb-2">You're all set, @{username}!</h1>
-        <p className="text-gray-500">{headingToChat ? 'Taking you to your chat…' : 'Taking you to your dashboard…'}</p>
+        <p className="text-gray-500 mb-8 max-w-xs">Invite a friend so they can reach you on VoiceID too — no phone number needed.</p>
+
+        <div className="w-full max-w-xs space-y-3">
+          <button
+            onClick={handleShare}
+            className="w-full py-4 font-semibold text-white bg-black rounded-full hover:bg-gray-800 transition flex items-center justify-center gap-2"
+          >
+            {copied ? <Check size={18} /> : <Share2 size={18} />}
+            {copied ? 'Link copied!' : 'Share Your Profile'}
+          </button>
+
+          <div className="flex items-center gap-2 px-4 py-3 bg-gray-50 rounded-full text-xs text-gray-500 truncate">
+            <span className="flex-1 truncate text-left">{shareUrl}</span>
+            <button
+              type="button"
+              aria-label="Copy link"
+              onClick={async () => {
+                try {
+                  await navigator.clipboard.writeText(shareUrl);
+                  setCopied(true);
+                  setTimeout(() => setCopied(false), 2000);
+                } catch { /* nothing more we can do silently */ }
+              }}
+              className="shrink-0 text-gray-400 hover:text-gray-700"
+            >
+              <Copy size={14} />
+            </button>
+          </div>
+
+          <button
+            onClick={() => navigate(destinationRef.current)}
+            className="w-full py-3 text-sm text-gray-500 hover:text-gray-800 transition"
+          >
+            {headingToChat ? 'Skip, take me to my chat' : 'Skip, take me to my dashboard'}
+          </button>
+        </div>
       </div>
     );
   }

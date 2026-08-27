@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
+import { uploadMediaWithRetry } from '../lib/uploadMediaWithRetry';
 
 export type StoryContentType = 'photo' | 'video' | 'text' | 'voice';
 
@@ -213,17 +214,7 @@ export function useStories() {
 }
 
 export async function uploadStoryMedia(file: Blob, mimeType: string): Promise<string> {
-  const session = await supabase.auth.getSession();
-  const token = session.data.session?.access_token;
-  const res = await fetch('/api/media/upload', {
-    method: 'POST',
-    headers: { 'Content-Type': mimeType, Authorization: `Bearer ${token}` },
-    body: file,
-  });
-  if (!res.ok) throw new Error('Failed to upload story media');
-  const { objectKey } = await res.json();
-  if (!objectKey) throw new Error('Upload did not return an object key');
-  return objectKey;
+  return uploadMediaWithRetry(file, mimeType);
 }
 
 export function storyMediaUrl(storyId: string): string {

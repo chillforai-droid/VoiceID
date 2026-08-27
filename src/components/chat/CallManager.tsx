@@ -17,15 +17,53 @@ export const CallManager = () => {
   const [controlsVisible, setControlsVisible] = useState(true);
   const hideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Android app only — the site defaults to earpiece automatically, this
-  // lets the user flip to loudspeaker and back, same as a real phone dialer.
   const hasNativeAudioRouter = typeof window !== 'undefined' && !!(window as any).AndroidAudioRouter;
+  // On the plain website (no native bridge) there was previously no way to
+  // move audio off the loudspeaker at all — this is why a connected
+  // Bluetooth headset was often ignored and calls stayed on speaker.
+  // HTMLMediaElement.setSinkId() lets us pick an output device directly,
+  // where the browser supports it (desktop Chrome/Edge reliably; Android
+  // Chrome partially; Safari/iOS not at all — there's no web API that can
+  // force those to route to Bluetooth, only the native app can).
+  const supportsSinkId = typeof window !== 'undefined' && typeof (window as any).HTMLMediaElement !== 'undefined'
+    && 'setSinkId' in (window as any).HTMLMediaElement.prototype;
   const [isSpeakerOn, setIsSpeakerOn] = useState(false);
-  const toggleSpeaker = () => {
+  const [audioRouteError, setAudioRouteError] = useState<string | null>(null);
+
+  const toggleSpeaker = async () => {
     const next = !isSpeakerOn;
-    setIsSpeakerOn(next);
-    (window as any).AndroidAudioRouter?.setSpeakerOn?.(next);
+    setAudioRouteError(null);
+
+    if (hasNativeAudioRouter) {
+      setIsSpeakerOn(next);
+      (window as any).AndroidAudioRouter?.setSpeakerOn?.(next);
+      return;
+    }
+
+    if (!supportsSinkId || !remoteAudioRef.current) return;
+    try {
+      // Ask for device labels (enumerateDevices only returns them after a
+      // getUserMedia permission grant, which a call already has by now).
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const outputs = devices.filter(d => d.kind === 'audiooutput');
+      let target: MediaDeviceInfo | undefined;
+      if (next) {
+        // Loudspeaker: prefer a device explicitly labelled as one.
+        target = outputs.find(d => /speaker/i.test(d.label));
+      } else {
+        // Earpiece/headset: prefer Bluetooth or a wired headset over the
+        // default output.
+        target = outputs.find(d => /bluetooth|headset|hands-?free|earpiece/i.test(d.label));
+      }
+      await (remoteAudioRef.current as any).setSinkId(target?.deviceId || 'default');
+      setIsSpeakerOn(next);
+    } catch (err: any) {
+      console.error('toggleSpeaker: setSinkId failed', err);
+      setAudioRouteError('Couldn\u2019t switch audio output on this browser.');
+    }
   };
+
+  const canToggleSpeaker = hasNativeAudioRouter || supportsSinkId;
 
   useEffect(() => {
     if (!activeCall || !user) { setOtherProfile(null); return; }
@@ -139,7 +177,7 @@ export const CallManager = () => {
             </button>
           )}
 
-          {isActive && hasNativeAudioRouter && (
+          {isActive && canToggleSpeaker && (
             <button aria-label={isSpeakerOn ? 'Switch to earpiece' : 'Switch to loudspeaker'} onClick={toggleSpeaker}
               className={`w-16 h-16 rounded-full flex items-center justify-center transition ${isSpeakerOn ? 'bg-white text-gray-900 ring-2 ring-blue-500' : isVideo ? 'bg-white/20 text-white backdrop-blur' : 'bg-slate-100 dark:bg-slate-800 text-gray-900 dark:text-white'}`}>
               {isSpeakerOn ? <Volume2 size={26} /> : <Volume1 size={26} />}
@@ -164,6 +202,10 @@ export const CallManager = () => {
             <PhoneOff size={28} />
           </button>
         </div>
+      )}
+
+      {audioRouteError && (
+        <p className="mt-3 text-xs text-red-400 relative z-10">{audioRouteError}</p>
       )}
     </div>
   );

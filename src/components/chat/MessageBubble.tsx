@@ -64,7 +64,7 @@ function MessageBubbleImpl({
             {m.content_type === 'voice' ? <VoiceMessage message={m} /> : (m.content_type === 'image' ? <ImageMessage message={m} /> : <span className="whitespace-pre-wrap [overflow-wrap:anywhere]"><LinkifiedText text={m.content_body} /></span>)}
             <p className={`text-[10px] mt-1 ${isOwn ? 'text-blue-100' : 'text-gray-400'}`}>
               {new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-              {isOwn && m.local_failed && <span className="ml-1 inline-flex items-center gap-0.5 text-red-300"><AlertCircle size={10} /> failed to send</span>}
+              {isOwn && m.local_failed && <span className="ml-1 inline-flex items-center gap-0.5 text-red-300"><AlertCircle size={10} /> {m.local_failed_reason || 'failed to send'}</span>}
               {isOwn && m.local_pending && !m.local_failed && <span className="ml-1 inline-flex items-center gap-0.5"><Clock3 size={10} /> sending</span>}
               {isOwn && !m.local_pending && !m.local_failed && (
                 <span className={`ml-1 inline-flex items-center ${receiptStatus === 'read' ? 'text-white' : 'text-blue-100'}`}>

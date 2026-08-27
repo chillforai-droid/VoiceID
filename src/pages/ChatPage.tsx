@@ -11,6 +11,7 @@ import { MediaCache } from '../lib/MediaCache';
 import { useVoiceCall } from '../hooks/useVoiceCall';
 import { usePresence } from '../context/PresenceContext';
 import { OfflineMessageStore } from '../lib/OfflineMessageStore';
+import { uploadMediaWithRetry } from '../lib/uploadMediaWithRetry';
 
 export default function ChatPage() {
   const { id } = useParams();
@@ -150,8 +151,8 @@ export default function ChatPage() {
     };
     setMessages(prev => [...prev, localMessage]);
 
-    const markFailed = () => {
-      setMessages(prev => prev.map(m => m.id === messageId ? { ...m, local_pending: false, local_failed: true } : m));
+    const markFailed = (reason?: string) => {
+      setMessages(prev => prev.map(m => m.id === messageId ? { ...m, local_pending: false, local_failed: true, local_failed_reason: reason } : m));
     };
 
     try {
@@ -160,25 +161,14 @@ export default function ChatPage() {
       const hashArray = Array.from(new Uint8Array(hashBuffer));
       const sha256 = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 
-      const session = await supabase.auth.getSession();
-      const token = session.data.session?.access_token;
-
-      const uploadRes = await fetch("/api/media/upload", {
-        method: "POST",
-        headers: {
-          "Content-Type": file.type,
-          "Authorization": `Bearer ${token}`
-        },
-        body: file,
-      });
-
-      if (!uploadRes.ok) {
-        console.error("handleImageUpload: proxy upload failed", await uploadRes.text());
-        markFailed();
+      let objectKey: string;
+      try {
+        objectKey = await uploadMediaWithRetry(file, file.type);
+      } catch (uploadErr: any) {
+        console.error("handleImageUpload: upload failed", uploadErr);
+        markFailed(uploadErr?.message);
         return;
       }
-
-      const { objectKey } = await uploadRes.json();
 
       const { data: message, error: dbError } = await supabase.from('messages').insert({
         id: messageId,
@@ -195,7 +185,7 @@ export default function ChatPage() {
 
       if (dbError || !message) {
         console.error('Image message insert error:', dbError);
-        markFailed();
+        markFailed('Could not save the message. Please try again.');
         return;
       }
 
@@ -215,9 +205,9 @@ export default function ChatPage() {
 
       setMessages(prev => prev.map(m => m.id === messageId ? message : m));
       URL.revokeObjectURL(localUrl);
-    } catch (err) {
+    } catch (err: any) {
       console.error('handleImageUpload: failed', err);
-      markFailed();
+      markFailed(err?.message);
     }
   };
 

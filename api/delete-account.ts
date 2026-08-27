@@ -12,11 +12,22 @@ import { supabaseAdmin, verifyAuth } from "../lib/auth.js";
  * api/ endpoints.
  *
  * Most of the schema cascades cleanly off profiles.id -> auth.users
- * (ON DELETE CASCADE), so deleting the auth user alone cleans up messages,
- * conversations, contacts, etc. One table doesn't: call_history.caller_id /
- * receiver_id reference profiles with no ON DELETE action, so leaving a row
- * behind for a user who ever made or received a call would make the delete
- * fail outright with a foreign key violation. That table is cleared first.
+ * (ON DELETE CASCADE) — messages, conversations, conversation_members,
+ * stories, story_views, message_receipts, contact_notifications, etc.
+ * A handful of tables were created WITHOUT an ON DELETE action on their
+ * profiles-referencing columns, so a leftover row in any of them makes the
+ * delete fail outright with a foreign key violation for any user who ever
+ * used that feature:
+ *   - call_history.caller_id / receiver_id
+ *   - calls.caller_id / receiver_id            (a separate table from
+ *     call_history — both exist and both needed clearing)
+ *   - contacts.requester_id / responder_id     (this is the one the SQL
+ *     Editor's own error message named directly)
+ *   - notifications.user_id / actor_id
+ *   - push_tokens.user_id
+ * All five are cleared before the auth user is deleted. (organizations /
+ * organization_members / audit_logs also reference profiles with no
+ * cascade, but nothing in the app writes to them, so they're left alone.)
  */
 export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
@@ -26,14 +37,36 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const user = await verifyAuth(req);
         if (!user) return res.status(401).json({ error: "Unauthorized" });
 
-        stage = "clear_call_history";
-        const { error: callHistoryError } = await supabaseAdmin
-            .from('call_history')
-            .delete()
-            .or(`caller_id.eq.${user.id},receiver_id.eq.${user.id}`);
-        if (callHistoryError) {
-            console.error('delete-account: failed to clear call_history', callHistoryError);
-            return res.status(500).json({ error: 'Failed to delete account', stage, message: callHistoryError.message });
+        const cleanupSteps: Array<{ stage: string; run: () => Promise<{ error: any }> }> = [
+            {
+                stage: 'clear_call_history',
+                run: () => supabaseAdmin.from('call_history').delete().or(`caller_id.eq.${user.id},receiver_id.eq.${user.id}`),
+            },
+            {
+                stage: 'clear_calls',
+                run: () => supabaseAdmin.from('calls').delete().or(`caller_id.eq.${user.id},receiver_id.eq.${user.id}`),
+            },
+            {
+                stage: 'clear_contacts',
+                run: () => supabaseAdmin.from('contacts').delete().or(`requester_id.eq.${user.id},responder_id.eq.${user.id}`),
+            },
+            {
+                stage: 'clear_notifications',
+                run: () => supabaseAdmin.from('notifications').delete().or(`user_id.eq.${user.id},actor_id.eq.${user.id}`),
+            },
+            {
+                stage: 'clear_push_tokens',
+                run: () => supabaseAdmin.from('push_tokens').delete().eq('user_id', user.id),
+            },
+        ];
+
+        for (const step of cleanupSteps) {
+            stage = step.stage;
+            const { error } = await step.run();
+            if (error) {
+                console.error(`delete-account: failed at ${step.stage}`, error);
+                return res.status(500).json({ error: 'Failed to delete account', stage, message: error.message });
+            }
         }
 
         stage = "delete_auth_user";
