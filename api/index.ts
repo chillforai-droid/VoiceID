@@ -16,81 +16,41 @@ import cloudinarySignHandler from "../lib/api-handlers/cloudinary-sign";
 /**
  * Single Vercel Serverless Function dispatcher.
  *
- * Vercel Hobby deployments have a per-deployment Serverless Function limit.
- * Only this file lives under /api so all application API handlers are bundled
- * behind one Vercel Function. The public URLs stay unchanged through
- * vercel.json rewrites.
- *
- * The pathname fallback is intentional: if a request reaches this function
- * without the expected `route` query parameter (for example from a local
- * test or a future routing change), we can still resolve the known endpoint
- * instead of returning a misleading 404.
+ * Vercel Hobby limits a project to 12 Serverless Functions per deployment.
+ * Keeping every endpoint under api/ would hit that limit. The actual handlers
+ * live in lib/api-handlers/ (which Vercel does not count as functions), while
+ * this file is the only file under api/ and dispatches requests by `route`.
  */
-
-type Handler = (req: VercelRequest, res: VercelResponse) => unknown;
-
-const HANDLERS: Record<string, Handler> = {
-  upload: uploadHandler,
-  "upload-auth": uploadAuthHandler,
-  "download-auth": downloadAuthHandler,
-  download: downloadHandler,
-  ack: ackHandler,
-  delete: deleteHandler,
-  "story-media": storyMediaHandler,
-  "profile-og": profileOgHandler,
-  "ai-reply": aiReplyHandler,
-  "send-push": sendPushHandler,
-  "delete-account": deleteAccountHandler,
-  "cloudinary-sign": cloudinarySignHandler as Handler,
-};
-
-function firstQueryValue(value: string | string[] | undefined): string {
-  return Array.isArray(value) ? String(value[0] ?? "") : String(value ?? "");
-}
-
-function resolveRoute(req: VercelRequest): string {
-  const explicit = firstQueryValue(req.query.route).toLowerCase();
-  if (explicit) return explicit;
-
-  // Defensive fallback for direct /api/<endpoint> requests.
-  const pathname = String(req.url || "").split("?", 1)[0];
-  const pathMap: Record<string, string> = {
-    "/api/media/upload": "upload",
-    "/api/media/upload-auth": "upload-auth",
-    "/api/media/download-auth": "download-auth",
-    "/api/media/download": "download",
-    "/api/media/ack": "ack",
-    "/api/media/story": "story-media",
-    "/api/ai-reply": "ai-reply",
-    "/api/send-push": "send-push",
-    "/api/delete-account": "delete-account",
-    "/api/cloudinary-sign": "cloudinary-sign",
-  };
-
-  if (pathMap[pathname]) return pathMap[pathname];
-  if (pathname.startsWith("/api/media/delete/")) return "delete";
-  return "";
-}
-
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  const route = resolveRoute(req);
-  const selected = HANDLERS[route];
+  const route = String(req.query.route || "").toLowerCase();
 
-  if (!selected) {
-    return res.status(404).json({ error: "API route not found" });
+  switch (route) {
+    case "upload":
+      return uploadHandler(req, res);
+    case "upload-auth":
+      return uploadAuthHandler(req, res);
+    case "download-auth":
+      return downloadAuthHandler(req, res);
+    case "download":
+      return downloadHandler(req, res);
+    case "ack":
+      return ackHandler(req, res);
+    case "delete":
+      (req as any).query = { ...req.query, objectKey: req.query.objectKey };
+      return deleteHandler(req, res);
+    case "story-media":
+      return storyMediaHandler(req, res);
+    case "profile-og":
+      return profileOgHandler(req, res);
+    case "ai-reply":
+      return aiReplyHandler(req, res);
+    case "send-push":
+      return sendPushHandler(req, res);
+    case "delete-account":
+      return deleteAccountHandler(req, res);
+    case "cloudinary-sign":
+      return cloudinarySignHandler(req as any, res as any);
+    default:
+      return res.status(404).json({ error: "API route not found" });
   }
-
-  // Preserve the objectKey from the rewrite/path for the delete handler.
-  if (route === "delete" && !req.query.objectKey) {
-    const pathname = String(req.url || "").split("?", 1)[0];
-    const marker = "/api/media/delete/";
-    if (pathname.startsWith(marker)) {
-      (req as any).query = {
-        ...req.query,
-        objectKey: decodeURIComponent(pathname.slice(marker.length)),
-      };
-    }
-  }
-
-  return selected(req, res);
 }

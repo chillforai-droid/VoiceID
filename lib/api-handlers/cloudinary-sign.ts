@@ -1,7 +1,7 @@
-import { Request, Response } from 'express';
+import { VercelRequest, VercelResponse } from "@vercel/node";
 import crypto from 'crypto';
 
-export default function handler(req: Request, res: Response) {
+export default function handler(req: VercelRequest, res: VercelResponse) {
   const { timestamp, folder, public_id } = req.body;
   const apiSecret = process.env.CLOUDINARY_API_SECRET;
   const apiKey = process.env.CLOUDINARY_API_KEY;

@@ -1,57 +1,17 @@
 {
-  "$schema": "https://openapi.vercel.sh/vercel.json",
   "rewrites": [
-    {
-      "source": "/api/media/upload",
-      "destination": "/api?route=upload"
-    },
-    {
-      "source": "/api/media/upload-auth",
-      "destination": "/api?route=upload-auth"
-    },
-    {
-      "source": "/api/media/download-auth",
-      "destination": "/api?route=download-auth"
-    },
-    {
-      "source": "/api/media/download",
-      "destination": "/api?route=download"
-    },
-    {
-      "source": "/api/media/ack",
-      "destination": "/api?route=ack"
-    },
-    {
-      "source": "/api/media/delete/:objectKey",
-      "destination": "/api?route=delete&objectKey=:objectKey"
-    },
-    {
-      "source": "/api/media/story",
-      "destination": "/api?route=story-media"
-    },
-    {
-      "source": "/api/ai-reply",
-      "destination": "/api?route=ai-reply"
-    },
-    {
-      "source": "/api/send-push",
-      "destination": "/api?route=send-push"
-    },
-    {
-      "source": "/api/delete-account",
-      "destination": "/api?route=delete-account"
-    },
-    {
-      "source": "/api/cloudinary-sign",
-      "destination": "/api?route=cloudinary-sign"
-    },
-    {
-      "source": "/u/:username",
-      "destination": "/api?route=profile-og&username=:username"
-    },
-    {
-      "source": "/((?!api/).*)",
-      "destination": "/index.html"
-    }
+    { "source": "/api/media/upload", "destination": "/api?route=upload" },
+    { "source": "/api/media/upload-auth", "destination": "/api?route=upload-auth" },
+    { "source": "/api/media/download-auth", "destination": "/api?route=download-auth" },
+    { "source": "/api/media/download", "destination": "/api?route=download" },
+    { "source": "/api/media/ack", "destination": "/api?route=ack" },
+    { "source": "/api/media/delete/:objectKey", "destination": "/api?route=delete&objectKey=:objectKey" },
+    { "source": "/api/media/story", "destination": "/api?route=story-media" },
+    { "source": "/api/ai-reply", "destination": "/api?route=ai-reply" },
+    { "source": "/api/send-push", "destination": "/api?route=send-push" },
+    { "source": "/api/delete-account", "destination": "/api?route=delete-account" },
+    { "source": "/api/cloudinary-sign", "destination": "/api?route=cloudinary-sign" },
+    { "source": "/u/:username", "destination": "/api?route=profile-og&username=:username" },
+    { "source": "/((?!api/).*)", "destination": "/index.html" }
   ]
 }
