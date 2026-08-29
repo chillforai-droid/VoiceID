@@ -37,7 +37,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const user = await verifyAuth(req);
         if (!user) return res.status(401).json({ error: "Unauthorized" });
 
-        const cleanupSteps: Array<{ stage: string; run: () => Promise<{ error: any }> }> = [
+        const cleanupSteps: Array<{ stage: string; run: () => PromiseLike<{ error: any }> }> = [
             {
                 stage: 'clear_call_history',
                 run: () => supabaseAdmin.from('call_history').delete().or(`caller_id.eq.${user.id},receiver_id.eq.${user.id}`),

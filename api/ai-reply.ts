@@ -185,7 +185,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       .slice()
       .reverse()
       .map((m) => ({
-        role: m.sender_id === aiProfile.id ? "assistant" : "user",
+        role: (m.sender_id === aiProfile.id ? "assistant" : "user") as LlmMessage["role"],
         content: m.content_type === "text" ? (m.content_body || "") : `[sent ${m.content_type === "image" ? "a photo" : "a voice message"}]`,
       }))
       .filter((m) => m.content.trim().length > 0);
