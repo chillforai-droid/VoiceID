@@ -40,7 +40,7 @@ export default function ConversationsPage() {
         .select(`
           id,
           last_message_at,
-          conversation_members(user_id, profiles(display_name, avatar_url)),
+          conversation_members(user_id, profiles(display_name, avatar_url, is_ai)),
           messages(content_body, created_at, content_type)
         `)
         .in('id', convIds)
@@ -108,7 +108,12 @@ export default function ConversationsPage() {
                     )}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="font-semibold text-gray-900 truncate">{name}</p>
+                  <p className="font-semibold text-gray-900 truncate flex items-center gap-1.5">
+                    {name}
+                    {otherMember?.is_ai && (
+                      <span className="shrink-0 text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-purple-100 text-purple-700">AI</span>
+                    )}
+                  </p>
                   <p className="text-sm text-gray-500 truncate">
                     {latestMessage?.content_type === 'voice' ? 'Voice message' : (latestMessage?.content_body || 'No messages')}
                   </p>

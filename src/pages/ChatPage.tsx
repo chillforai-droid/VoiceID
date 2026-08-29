@@ -292,7 +292,7 @@ export default function ChatPage() {
       }
       if (!cancelled) setMessagesLoading(false);
 
-      const { data: members } = await supabase.from('conversation_members').select('user_id, profiles(display_name, avatar_url)').eq('conversation_id', id).neq('user_id', user.id);
+      const { data: members } = await supabase.from('conversation_members').select('user_id, profiles(display_name, avatar_url, is_ai)').eq('conversation_id', id).neq('user_id', user.id);
       if (!cancelled && members && members.length > 0) setOtherUser(members[0]);
       await flushOutbox();
     };
@@ -520,12 +520,19 @@ export default function ChatPage() {
              {otherUser?.profiles?.avatar_url ? <img src={otherUser.profiles.avatar_url} alt="" decoding="async" className="w-full h-full object-cover" /> : otherUser?.profiles?.display_name?.charAt(0)}
         </div>
         <div className="flex-1 min-w-0">
-          <div className="font-semibold text-gray-900 truncate">{otherUser?.profiles?.display_name || 'Conversation'}</div>
+          <div className="font-semibold text-gray-900 truncate flex items-center gap-1.5">
+            {otherUser?.profiles?.display_name || 'Conversation'}
+            {otherUser?.profiles?.is_ai && (
+              <span className="shrink-0 text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-purple-100 text-purple-700">AI</span>
+            )}
+          </div>
           <div className="text-xs min-h-4 truncate">
-            {isOtherTyping ? <span className="text-blue-600 font-medium">typing...</span> : isNetworkOnline ? (isUserOnline(otherUser?.user_id) ? <span className="text-green-600">online</span> : <span className="text-gray-400">offline</span>) : <span className="text-amber-600">You’re offline · messages will send when online</span>}
+            {otherUser?.profiles?.is_ai ? (
+              isOtherTyping ? <span className="text-blue-600 font-medium">typing...</span> : <span className="text-gray-400">AI companion</span>
+            ) : isOtherTyping ? <span className="text-blue-600 font-medium">typing...</span> : isNetworkOnline ? (isUserOnline(otherUser?.user_id) ? <span className="text-green-600">online</span> : <span className="text-gray-400">offline</span>) : <span className="text-amber-600">You’re offline · messages will send when online</span>}
           </div>
         </div>
-        {otherUser && (
+        {otherUser && !otherUser?.profiles?.is_ai && (
             <div className="flex items-center gap-1 shrink-0">
                 <button onClick={handleVideoCall} disabled={!isNetworkOnline || !isUserOnline(otherUser.user_id)} className={`p-2 hover:bg-gray-100 rounded-full disabled:opacity-40 ${isUserOnline(otherUser.user_id) ? 'text-gray-600' : 'text-gray-400'}`} aria-label="Video Call">
                     <Video size={20} />
