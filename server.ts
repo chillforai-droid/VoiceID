@@ -1,14 +1,14 @@
 import express from "express";
 import path from "path";
 import { createServer as createViteServer } from "vite";
-import uploadHandler from "./lib/api-handlers/upload";
-import uploadAuthHandler from "./lib/api-handlers/upload-auth";
-import downloadAuthHandler from "./lib/api-handlers/download-auth";
-import downloadHandler from "./lib/api-handlers/download";
-import ackHandler from "./lib/api-handlers/ack";
-import deleteHandler from "./lib/api-handlers/delete-object";
-import profileOgHandler from "./lib/api-handlers/profile-og";
-import storyMediaHandler from "./lib/api-handlers/story-media";
+import uploadHandler from "./api/upload";
+import uploadAuthHandler from "./api/upload-auth";
+import downloadAuthHandler from "./api/download-auth";
+import downloadHandler from "./api/download";
+import ackHandler from "./api/ack";
+import deleteHandler from "./api/delete/[objectKey]";
+import profileOgHandler from "./api/profile-og";
+import storyMediaHandler from "./api/story-media";
 
 async function startServer() {
   const app = express();
