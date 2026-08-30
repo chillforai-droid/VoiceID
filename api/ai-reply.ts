@@ -21,7 +21,7 @@ import { supabaseAdmin } from "../lib/auth.js";
  * down entirely.
  */
 
-const GEMINI_MODEL = process.env.AI_PERSONA_GEMINI_MODEL || "gemini-2.5-flash";
+const GEMINI_MODEL = process.env.AI_PERSONA_GEMINI_MODEL || "gemini-3.1-flash-lite";
 const GROQ_MODEL = process.env.AI_PERSONA_GROQ_MODEL || "llama-3.3-70b-versatile";
 const MAX_CONTEXT_MESSAGES = 20;
 const DAILY_MESSAGE_LIMIT = 50;
