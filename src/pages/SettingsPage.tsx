@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
-import { Loader2, Save, User, Bell, Shield, LogOut, Trash2, Ban, Sun, Moon, Monitor } from 'lucide-react';
+import { Loader2, Save, User, Bell, Shield, LogOut, Trash2, Ban, Sun, Moon, Monitor, BellRing } from 'lucide-react';
 import { Avatar } from '../components/common/Avatar';
 import { useTheme } from '../context/ThemeContext';
 import { ConfirmDialog } from '../components/chat/ConfirmDialog';
+import { enableWebPush, WebPushResult } from '../lib/webPush';
 
 export default function SettingsPage() {
   const { user, profile, updateProfile } = useAuth();
@@ -92,6 +93,27 @@ export default function SettingsPage() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState('');
+
+  const [webPushState, setWebPushState] = useState<'idle' | 'requesting' | 'enabled' | 'error'>('idle');
+  const [webPushMessage, setWebPushMessage] = useState('');
+
+  const handleEnableWebPush = async () => {
+    if (!user) return;
+    setWebPushState('requesting');
+    setWebPushMessage('');
+    const result: WebPushResult = await enableWebPush(user.id);
+    if (result.status === 'enabled') {
+      setWebPushState('enabled');
+    } else {
+      setWebPushState('error');
+      setWebPushMessage(
+        result.status === 'unsupported' ? 'Notifications aren\u2019t supported in this browser.' :
+        result.status === 'denied' ? 'Notification permission was denied. Enable it in your browser\u2019s site settings to turn this on.' :
+        result.status === 'not_configured' ? 'Notifications aren\u2019t set up for this site yet.' :
+        result.message || 'Something went wrong enabling notifications.'
+      );
+    }
+  };
 
   const deleteAccount = async () => {
     setShowDeleteConfirm(false);
@@ -194,6 +216,24 @@ export default function SettingsPage() {
             <input type="checkbox" checked={settings.notify_contact_requests} onChange={(e) => updateSettings({notify_contact_requests: e.target.checked})} />
             Contact Requests
         </label>
+
+        <div className="pt-2 border-t border-gray-100">
+          <p className="text-sm text-gray-500 mb-2">Get notified here in your browser for new messages, friend requests, and calls — even when this tab isn't open.</p>
+          {webPushState === 'enabled' ? (
+            <p className="text-sm text-green-600 flex items-center gap-1.5"><BellRing size={15}/> Browser notifications are on</p>
+          ) : (
+            <button
+              type="button"
+              onClick={handleEnableWebPush}
+              disabled={webPushState === 'requesting'}
+              className="px-5 py-2.5 bg-gray-900 text-white rounded-full flex items-center gap-2 justify-center disabled:opacity-50"
+            >
+              {webPushState === 'requesting' ? <Loader2 className="animate-spin" size={16}/> : <BellRing size={16}/>}
+              Enable Browser Notifications
+            </button>
+          )}
+          {webPushState === 'error' && <p className="text-sm text-red-600 mt-2">{webPushMessage}</p>}
+        </div>
       </div>}
 
       {/* Danger Zone */}

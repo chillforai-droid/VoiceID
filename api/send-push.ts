@@ -14,18 +14,24 @@ import { initializeApp, getApps, cert } from "firebase-admin/app";
  * 12-serverless-function-per-deployment cap — the logic is unchanged, it
  * just now branches on payload.table instead of being two files.
  *
- * Wiring (update BOTH webhooks in the Supabase Dashboard to point here):
+ * Wiring (update/add these webhooks in the Supabase Dashboard, all pointing
+ * to this same URL):
  *   Database -> Webhooks -> table "calls", event "Insert" ->
  *     URL = https://<your-domain>/api/send-push
  *   Database -> Webhooks -> table "messages", event "Insert" ->
  *     URL = https://<your-domain>/api/send-push
- *   Both need header `x-webhook-secret: <SUPABASE_WEBHOOK_SECRET>`
+ *   Database -> Webhooks -> table "contacts", event "Insert" ->
+ *     URL = https://<your-domain>/api/send-push
+ *   All three need header `x-webhook-secret: <SUPABASE_WEBHOOK_SECRET>`
  *   (must match the env var below).
  *
  * Silently does nothing for any recipient without a push_tokens row yet
  * (web-only users, or Android users who haven't opened the app since this
  * shipped) — the existing Realtime/in-app path keeps working exactly as
- * before regardless.
+ * before regardless. A user can have both an Android AND a web token
+ * simultaneously (push_tokens is now keyed on (user_id, platform), not
+ * just user_id) — sendToUserTokens() below sends to every registered
+ * device, not just one.
  */
 
 function ensureFirebaseInitialized() {
@@ -38,19 +44,41 @@ function ensureFirebaseInitialized() {
   }
 }
 
+async function sendToUserTokens(userId: string, payload: Record<string, string>): Promise<{ sent: number; failed: number }> {
+  const { data: tokenRows } = await supabaseAdmin
+    .from("push_tokens")
+    .select("token")
+    .eq("user_id", userId);
+
+  if (!tokenRows || tokenRows.length === 0) return { sent: 0, failed: 0 };
+
+  ensureFirebaseInitialized();
+
+  const results = await Promise.allSettled(
+    tokenRows.map((row) =>
+      getMessaging().send({
+        token: row.token,
+        // Data-only (no `notification` block) on every platform: Android's
+        // native FCM service and the website's firebase-messaging-sw.js
+        // (see public/firebase-messaging-sw.js) both read these fields
+        // themselves and call their own "show a notification" API, rather
+        // than letting the OS auto-render a generic one with no deep link.
+        data: payload,
+        android: { priority: "high" },
+        webpush: { headers: { Urgency: "high" } },
+      })
+    )
+  );
+
+  return {
+    sent: results.filter((r) => r.status === "fulfilled").length,
+    failed: results.filter((r) => r.status === "rejected").length,
+  };
+}
+
 async function handleCallPush(call: any, res: VercelResponse) {
   if (!call || call.status !== "ringing") {
     return res.json({ skipped: true, reason: "not a new ringing call" });
-  }
-
-  const { data: tokenRow } = await supabaseAdmin
-    .from("push_tokens")
-    .select("token")
-    .eq("user_id", call.receiver_id)
-    .maybeSingle();
-
-  if (!tokenRow?.token) {
-    return res.json({ skipped: true, reason: "receiver has no registered device token" });
   }
 
   const { data: caller } = await supabaseAdmin
@@ -59,25 +87,17 @@ async function handleCallPush(call: any, res: VercelResponse) {
     .eq("id", call.caller_id)
     .maybeSingle();
 
-  ensureFirebaseInitialized();
-
   try {
-    await getMessaging().send({
-      token: tokenRow.token,
-      // Data-only (no `notification` block) so Android always routes this to
-      // VoiceIdFirebaseMessagingService.onMessageReceived(), even while
-      // backgrounded — a `notification` block would instead let the OS
-      // auto-display a generic system notification with no Accept/Reject
-      // actions, which is exactly what this feature is replacing.
-      data: {
-        type: "incoming_call",
-        callId: call.id,
-        callerId: call.caller_id,
-        callerName: caller?.display_name || caller?.username || "Unknown",
-      },
-      android: { priority: "high" },
+    const { sent, failed } = await sendToUserTokens(call.receiver_id, {
+      type: "incoming_call",
+      callId: call.id,
+      callerId: call.caller_id,
+      callerName: caller?.display_name || caller?.username || "Unknown",
+      title: `Incoming call from ${caller?.display_name || caller?.username || "Unknown"}`,
+      body: "Tap to answer",
     });
-    res.json({ success: true });
+    if (sent === 0 && failed === 0) return res.json({ skipped: true, reason: "receiver has no registered device token" });
+    res.json({ success: true, sent, failed });
   } catch (error: any) {
     console.error("send-push (call): FCM send failed", error);
     res.status(500).json({ error: "Failed to send push" });
@@ -99,15 +119,6 @@ async function handleMessagePush(message: any, res: VercelResponse) {
     return res.json({ skipped: true, reason: "no other conversation members" });
   }
 
-  const { data: tokenRows } = await supabaseAdmin
-    .from("push_tokens")
-    .select("token")
-    .in("user_id", members.map((m) => m.user_id));
-
-  if (!tokenRows || tokenRows.length === 0) {
-    return res.json({ skipped: true, reason: "no recipients have a registered device token" });
-  }
-
   const { data: sender } = await supabaseAdmin
     .from("profiles")
     .select("display_name, username")
@@ -120,32 +131,57 @@ async function handleMessagePush(message: any, res: VercelResponse) {
     message.content_type === "image" ? "\ud83d\udcf7 Photo" :
     (message.content_body || "New message");
 
-  ensureFirebaseInitialized();
-
-  const results = await Promise.allSettled(
-    tokenRows.map((row) =>
-      getMessaging().send({
-        token: row.token,
-        data: {
-          type: "new_message",
-          conversationId: message.conversation_id,
-          senderId: message.sender_id,
-          senderName,
-          title: senderName,
-          body: preview,
-          deep_link: `/dashboard/chat/${message.conversation_id}`,
-        },
-        android: { priority: "high" },
+  const perUser = await Promise.all(
+    members.map((m) =>
+      sendToUserTokens(m.user_id, {
+        type: "new_message",
+        conversationId: message.conversation_id,
+        senderId: message.sender_id,
+        senderName,
+        title: senderName,
+        body: preview,
+        deep_link: `/dashboard/chat/${message.conversation_id}`,
       })
     )
   );
 
-  const failed = results.filter((r) => r.status === "rejected").length;
-  if (failed > 0) {
-    console.error(`send-push (message): ${failed}/${results.length} sends failed`);
+  const sent = perUser.reduce((sum, r) => sum + r.sent, 0);
+  const failed = perUser.reduce((sum, r) => sum + r.failed, 0);
+  if (failed > 0) console.error(`send-push (message): ${failed} send(s) failed`);
+
+  res.json({ success: true, sent, failed });
+}
+
+async function handleContactRequestPush(contact: any, res: VercelResponse) {
+  // Only the initial request, not later status changes — Supabase Database
+  // Webhooks only fire this on INSERT anyway, but this guards against the
+  // webhook config accidentally including Update too.
+  if (!contact || contact.status !== "pending") {
+    return res.json({ skipped: true, reason: "not a new pending request" });
   }
 
-  res.json({ success: true, sent: results.length - failed, failed });
+  const { data: requester } = await supabaseAdmin
+    .from("profiles")
+    .select("display_name, username")
+    .eq("id", contact.requester_id)
+    .maybeSingle();
+
+  const requesterName = requester?.display_name || requester?.username || "Someone";
+
+  try {
+    const { sent, failed } = await sendToUserTokens(contact.responder_id, {
+      type: "friend_request",
+      requesterId: contact.requester_id,
+      title: "Friend Request",
+      body: `${requesterName} sent you a friend request`,
+      deep_link: "/dashboard/notifications",
+    });
+    if (sent === 0 && failed === 0) return res.json({ skipped: true, reason: "recipient has no registered device token" });
+    res.json({ success: true, sent, failed });
+  } catch (error: any) {
+    console.error("send-push (contact request): FCM send failed", error);
+    res.status(500).json({ error: "Failed to send push" });
+  }
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -160,6 +196,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   if (payload?.table === "calls") return handleCallPush(record, res);
   if (payload?.table === "messages") return handleMessagePush(record, res);
+  if (payload?.table === "contacts") return handleContactRequestPush(record, res);
 
   res.json({ skipped: true, reason: "unrecognized table" });
 }

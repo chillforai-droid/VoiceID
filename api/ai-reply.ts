@@ -25,6 +25,15 @@ const GEMINI_MODEL = process.env.AI_PERSONA_GEMINI_MODEL || "gemini-3.1-flash-li
 const GROQ_MODEL = process.env.AI_PERSONA_GROQ_MODEL || "llama-3.3-70b-versatile";
 const MAX_CONTEXT_MESSAGES = 20;
 const DAILY_MESSAGE_LIMIT = 50;
+// A "nudge" run processes at most this many candidates per invocation, to
+// stay comfortably inside Vercel Hobby's 10-second function timeout (each
+// candidate costs one LLM call + a couple of DB round-trips). An external
+// scheduler hitting ?mode=nudge a few times a day (see handleNudgeMode
+// below) means anyone not reached in one run gets picked up a few hours
+// later in the next one — fine for a small user base; if this app grows
+// past what 3 runs/day can cover, that's a sign to move the LLM calls to
+// a queue instead of processing them inline here.
+const MAX_NUDGES_PER_RUN = 8;
 
 interface WebhookPayload {
   type: string;
@@ -103,7 +112,98 @@ async function generateReply(persona: string, messages: LlmMessage[]): Promise<s
   }
 }
 
+/**
+ * AI check-in "nudge" mode — what gets a user a proactive message from an
+ * AI persona a few times a day, so there's a reason to open the app/site
+ * even when nobody's messaged them. This is NOT a Vercel Cron job: Vercel
+ * Hobby only allows once-a-day cron schedules (see Vercel's cron-jobs
+ * docs), which can't do "3x/day" on its own. Instead, point a free
+ * external scheduler (e.g. cron-job.org — no card required) at this URL
+ * 3 times a day:
+ *
+ *   https://<your-domain>/api/ai-reply?mode=nudge&secret=<AI_NUDGE_SECRET>
+ *
+ * AI_NUDGE_SECRET is a Vercel env var you make up yourself (any random
+ * string) — it exists purely so a stranger who finds this URL can't spam
+ * every user with AI messages and burn your free LLM quota. Set the same
+ * value in both places.
+ *
+ * Each run only messages users the AI hasn't messaged in the last few
+ * hours (via the get_ai_nudge_candidates DB function), so calling this
+ * 3x/day naturally produces roughly 3 check-ins/day/user, not a flood —
+ * no separate "have I sent 3 today" counter needed.
+ */
+async function handleNudgeMode(req: VercelRequest, res: VercelResponse) {
+  const secret = (req.query.secret as string) || (req.headers["x-nudge-secret"] as string);
+  if (!process.env.AI_NUDGE_SECRET || secret !== process.env.AI_NUDGE_SECRET) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
+  if (!process.env.GEMINI_API_KEY && !process.env.GROQ_API_KEY) {
+    return res.status(200).json({ skipped: true, reason: "no_api_key" });
+  }
+
+  const { data: candidates, error } = await supabaseAdmin.rpc("get_ai_nudge_candidates", {
+    hours_since_last_ai_message: 6,
+  });
+
+  if (error || !candidates) {
+    console.error("ai-reply (nudge): failed to load candidates", error);
+    return res.status(200).json({ error: "candidates_query_failed" });
+  }
+
+  const batch = candidates.slice(0, MAX_NUDGES_PER_RUN);
+  let sent = 0;
+  let failed = 0;
+
+  for (const c of batch) {
+    try {
+      const { data: history } = await supabaseAdmin
+        .from("messages")
+        .select("sender_id, content_body, content_type")
+        .eq("conversation_id", c.conversation_id)
+        .order("created_at", { ascending: false })
+        .limit(10);
+
+      const llmMessages: LlmMessage[] = (history || [])
+        .slice()
+        .reverse()
+        .map((m) => ({
+          role: (m.sender_id === c.ai_id ? "assistant" : "user") as LlmMessage["role"],
+          content: m.content_type === "text" ? (m.content_body || "") : `[sent ${m.content_type === "image" ? "a photo" : "a voice message"}]`,
+        }))
+        .filter((m) => m.content.trim().length > 0);
+
+      const nudgeInstruction =
+        "\n\nRight now you're proactively checking in on the user because they haven't chatted with you in a while \u2014 this isn't a reply to anything they said. Send a short, warm, casual check-in message (1-2 sentences) inviting them to chat. Don't mention that you're doing a scheduled check-in.";
+
+      const replyText = await generateReply((c.ai_persona || "") + nudgeInstruction, llmMessages);
+
+      const { error: insertError } = await supabaseAdmin.from("messages").insert({
+        conversation_id: c.conversation_id,
+        sender_id: c.ai_id,
+        content_body: replyText,
+        content_type: "text",
+      });
+
+      if (insertError) {
+        console.error("ai-reply (nudge): failed to insert message", insertError);
+        failed++;
+      } else {
+        sent++;
+      }
+    } catch (err) {
+      console.error("ai-reply (nudge): failed for candidate", c.human_id, c.ai_id, err);
+      failed++;
+    }
+  }
+
+  res.status(200).json({ success: true, candidates: candidates.length, processed: batch.length, sent, failed });
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  if (req.query.mode === "nudge") return handleNudgeMode(req, res);
+
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
 
   try {
