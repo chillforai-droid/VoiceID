@@ -2,7 +2,6 @@ import React, { createContext, useContext, useEffect, useRef, useState, useCallb
 import { supabase } from '../lib/supabase';
 import { RealtimeChannel } from '@supabase/supabase-js';
 import { useAuth } from './AuthContext';
-import { usePresence } from './PresenceContext';
 
 export type CallType = 'voice' | 'video';
 
@@ -45,7 +44,6 @@ function buildIceServers() {
 
 export const VoiceCallProvider = ({ children }: { children: React.ReactNode }) => {
   const { user } = useAuth();
-  const { isUserOnline } = usePresence();
   const [callState, setCallState] = useState('idle');
   const callStateRef = useRef(callState);
   useEffect(() => { callStateRef.current = callState; }, [callState]);
@@ -339,13 +337,18 @@ export const VoiceCallProvider = ({ children }: { children: React.ReactNode }) =
   const canCallUser = useCallback(async (targetUserId: string): Promise<{ canCall: boolean; reason?: string }> => {
     if (!user) return { canCall: false, reason: 'User not authenticated' };
     if (targetUserId === user.id) return { canCall: false, reason: 'Cannot call self' };
-    if (!isUserOnline(targetUserId)) return { canCall: false, reason: 'User is offline' };
+    // Presence used to gate this ("User is offline") entirely, which
+    // defeated push-notification-based offline calling — a ringing call
+    // now reaches the other person even while their app/tab is closed
+    // (see api/send-push.ts's calls-table handler + the ringing-call
+    // catch-up check on mount in this file), so there's no reason calling
+    // an offline person should be blocked here.
     const { data: contact } = await supabase.from('contacts').select('id')
       .or(`and(requester_id.eq.${user.id},responder_id.eq.${targetUserId}),and(requester_id.eq.${targetUserId},responder_id.eq.${user.id})`)
       .eq('status', 'accepted').maybeSingle();
     if (!contact) return { canCall: false, reason: 'Must be friends to call' };
     return { canCall: true };
-  }, [user, isUserOnline]);
+  }, [user]);
 
   const initiateCall = useCallback(async (receiverId: string, requestedType: CallType = 'voice') => {
     if (!user || callStateRef.current !== 'idle') return;

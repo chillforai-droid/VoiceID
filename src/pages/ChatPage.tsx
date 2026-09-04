@@ -534,10 +534,17 @@ export default function ChatPage() {
         </div>
         {otherUser && !otherUser?.profiles?.is_ai && (
             <div className="flex items-center gap-1 shrink-0">
-                <button onClick={handleVideoCall} disabled={!isNetworkOnline || !isUserOnline(otherUser.user_id)} className={`p-2 hover:bg-gray-100 rounded-full disabled:opacity-40 ${isUserOnline(otherUser.user_id) ? 'text-gray-600' : 'text-gray-400'}`} aria-label="Video Call">
+                {/* Only gated on *our own* connectivity now — the other
+                    person's presence dot no longer disables calling them.
+                    A "ringing" call now reaches them via push notification
+                    even while their app/tab is fully closed (see
+                    api/send-push.ts + the ringing-call catch-up check in
+                    VoiceCallContext.tsx), so requiring them to already be
+                    online defeated that entirely. */}
+                <button onClick={handleVideoCall} disabled={!isNetworkOnline} className="p-2 hover:bg-gray-100 rounded-full disabled:opacity-40 text-gray-600" aria-label="Video Call">
                     <Video size={20} />
                 </button>
-                <button onClick={handleCall} disabled={!isNetworkOnline || !isUserOnline(otherUser.user_id)} className={`p-2 hover:bg-gray-100 rounded-full disabled:opacity-40 ${isUserOnline(otherUser.user_id) ? 'text-gray-600' : 'text-gray-400'}`} aria-label="Call">
+                <button onClick={handleCall} disabled={!isNetworkOnline} className="p-2 hover:bg-gray-100 rounded-full disabled:opacity-40 text-gray-600" aria-label="Call">
                     <Phone size={20} />
                 </button>
                 <div className={`w-2 h-2 rounded-full shrink-0 ${isUserOnline(otherUser.user_id) && isNetworkOnline ? 'bg-green-500' : 'bg-gray-300'}`} />
