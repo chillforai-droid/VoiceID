@@ -463,6 +463,38 @@ export const VoiceCallProvider = ({ children }: { children: React.ReactNode }) =
   // Incoming calls + remote status changes for the user's active/incoming calls.
   useEffect(() => {
     if (!user) return;
+
+    // Catch-up check: the realtime subscription below only fires for calls
+    // INSERTed *after* it connects — it can't "replay" a call that started
+    // ringing while this device had no live connection (app closed/tab not
+    // open). That's exactly the case a push notification opens the app
+    // into, so without this, tapping the notification would bring the
+    // person back to an app showing no incoming call at all. This runs once
+    // on mount to pick up any call still actively ringing for this user.
+    (async () => {
+      const { data: ringingCall } = await supabase
+        .from('calls')
+        .select('*')
+        .eq('receiver_id', user.id)
+        .eq('status', 'ringing')
+        // A ringing call older than ~45s is almost certainly stale (caller's
+        // own client normally marks it 'missed'/'ended' well before then) —
+        // skip it rather than surface a call that's already effectively over.
+        .gt('created_at', new Date(Date.now() - 45_000).toISOString())
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (ringingCall && callStateRef.current === 'idle') {
+        activeCallRef.current = ringingCall;
+        setActiveCall(ringingCall);
+        const incomingType: CallType = ringingCall.call_type === 'video' ? 'video' : 'voice';
+        callTypeRef.current = incomingType;
+        setCallType(incomingType);
+        setState('ringing-incoming');
+      }
+    })();
+
     const channel = supabase.channel(`calls:${user.id}`);
     callsChannel.current = channel;
     channel.on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'calls', filter: `receiver_id=eq.${user.id}` }, payload => {

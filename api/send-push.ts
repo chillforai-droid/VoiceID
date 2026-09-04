@@ -95,6 +95,7 @@ async function handleCallPush(call: any, res: VercelResponse) {
       callerName: caller?.display_name || caller?.username || "Unknown",
       title: `Incoming call from ${caller?.display_name || caller?.username || "Unknown"}`,
       body: "Tap to answer",
+      deep_link: `/dashboard`,
     });
     if (sent === 0 && failed === 0) return res.json({ skipped: true, reason: "receiver has no registered device token" });
     res.json({ success: true, sent, failed });
