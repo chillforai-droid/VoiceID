@@ -1,5 +1,5 @@
 import { useAuth } from '../context/AuthContext';
-import { Mail, Search, MessageSquare } from 'lucide-react';
+import { Mail, Search, MessageSquare, Users } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { StoriesBar } from '../components/stories/StoriesBar';
 
@@ -9,6 +9,7 @@ export default function HomePage() {
 
   const actions = [
     { label: 'Messages', icon: Mail, path: '/dashboard/messages' },
+    { label: 'Rooms', icon: Users, path: '/dashboard/rooms' },
     { label: 'Search VoiceID', icon: Search, path: '/dashboard/search' },
     { label: 'Start Chat', icon: MessageSquare, path: '/dashboard/search' },
   ];

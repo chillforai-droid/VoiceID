@@ -1,6 +1,6 @@
-import { MessageSquare, UserPlus, UserCheck, PhoneMissed, Bell, type LucideIcon } from 'lucide-react';
+import { MessageSquare, UserPlus, UserCheck, PhoneMissed, Bell, Users, type LucideIcon } from 'lucide-react';
 
-export type NotificationCategory = 'messages' | 'friends' | 'calls' | 'system';
+export type NotificationCategory = 'messages' | 'friends' | 'calls' | 'system' | 'rooms';
 
 export interface NotificationMeta {
   category: NotificationCategory;
@@ -18,6 +18,11 @@ const META: Record<string, NotificationMeta> = {
   friend_accepted: { category: 'friends', icon: UserCheck, color: 'text-green-600', bg: 'bg-green-50' },
   contact_request: { category: 'friends', icon: UserCheck, color: 'text-green-600', bg: 'bg-green-50' }, // legacy rows
   missed_call: { category: 'calls', icon: PhoneMissed, color: 'text-red-600', bg: 'bg-red-50' },
+  room_join_request: { category: 'rooms', icon: Users, color: 'text-purple-600', bg: 'bg-purple-50' },
+  room_invite: { category: 'rooms', icon: Users, color: 'text-purple-600', bg: 'bg-purple-50' },
+  room_join_approved: { category: 'rooms', icon: Users, color: 'text-purple-600', bg: 'bg-purple-50' },
+  room_join_rejected: { category: 'rooms', icon: Users, color: 'text-purple-600', bg: 'bg-purple-50' },
+  room_invite_accepted: { category: 'rooms', icon: Users, color: 'text-purple-600', bg: 'bg-purple-50' },
 };
 
 const DEFAULT_META: NotificationMeta = { category: 'system', icon: Bell, color: 'text-gray-600', bg: 'bg-gray-100' };
@@ -32,6 +37,7 @@ export const FILTERS: { key: 'all' | 'unread' | NotificationCategory; label: str
   { key: 'messages', label: 'Messages' },
   { key: 'friends', label: 'Friends' },
   { key: 'calls', label: 'Calls' },
+  { key: 'rooms', label: 'Rooms' },
   { key: 'system', label: 'System' },
 ];
 
@@ -58,6 +64,13 @@ export function resolveNotificationRoute(notification: any): string | null {
 
     case 'missed_call':
       return `/dashboard/calls`;
+
+    case 'room_join_request':
+    case 'room_invite':
+    case 'room_join_approved':
+    case 'room_join_rejected':
+    case 'room_invite_accepted':
+      return related_id ? `/dashboard/rooms/${related_id}` : `/dashboard/rooms`;
 
     default:
       // Unknown / future type — no crash, caller shows a fallback.

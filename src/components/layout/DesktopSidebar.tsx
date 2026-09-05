@@ -1,5 +1,5 @@
 import { memo } from 'react';
-import { Home, Search, Mail, Bell, Settings, LogOut, User } from 'lucide-react';
+import { Home, Search, Mail, Bell, Settings, LogOut, User, Users } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useNotifications } from '../../context/NotificationContext';
@@ -13,6 +13,7 @@ function DesktopSidebar() {
     { icon: Home, label: 'Home', path: '/dashboard', badge: 0 },
     { icon: Search, label: 'Search', path: '/dashboard/search', badge: 0 },
     { icon: Mail, label: 'Messages', path: '/dashboard/messages', badge: unreadMessageCount },
+    { icon: Users, label: 'Rooms', path: '/dashboard/rooms', badge: 0 },
     { icon: Bell, label: 'Notifications', path: '/dashboard/notifications', badge: unreadCount },
     { icon: User, label: 'Profile', path: user ? `/dashboard/profile/${user.id}` : '/dashboard/profile/me', badge: 0 },
     { icon: Settings, label: 'Settings', path: '/dashboard/settings', badge: 0 },

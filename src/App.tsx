@@ -53,6 +53,8 @@ const EditProfilePage = lazy(() => import('./pages/EditProfilePage'));
 const NotificationsPage = lazy(() => import('./pages/NotificationsPage'));
 const ConversationsPage = lazy(() => import('./pages/ConversationsPage'));
 const ChatPage = lazy(() => import('./pages/ChatPage'));
+const RoomsPage = lazy(() => import('./pages/RoomsPage'));
+const RoomPage = lazy(() => import('./pages/RoomPage'));
 const CallHistoryPage = lazy(() => import('./pages/CallHistoryPage'));
 const SettingsPage = lazy(() => import('./pages/SettingsPage'));
 
@@ -102,6 +104,8 @@ export default function App() {
                     <Route path="profile/edit" element={<EditProfilePage />} />
                     <Route path="messages" element={<ConversationsPage />} />
                     <Route path="chat/:id" element={<ChatPage />} />
+                    <Route path="rooms" element={<RoomsPage />} />
+                    <Route path="rooms/:id" element={<RoomPage />} />
                     <Route path="calls" element={<CallHistoryPage />} />
                     <Route path="notifications" element={<NotificationsPage />} />
                     <Route path="settings" element={<SettingsPage />} />
