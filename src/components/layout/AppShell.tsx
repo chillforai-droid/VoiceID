@@ -12,13 +12,18 @@ interface AppShellProps {
 
 export default function AppShell({ children }: AppShellProps) {
   const location = useLocation();
-  const isChatRoute = location.pathname.startsWith('/dashboard/chat/');
+  // Both 1:1 chat and an open room own the full screen with their own
+  // header/input bar (mirrors a live chat app) — the shared top header and
+  // bottom nav would otherwise double up with the page's own controls and
+  // break the layout on mobile.
+  const isImmersiveRoute = location.pathname.startsWith('/dashboard/chat/')
+    || /^\/dashboard\/rooms\/[^/]+$/.test(location.pathname);
 
   return (
     <div className="flex h-[100dvh] bg-gray-50">
       <CallManager />
       {/* Desktop Sidebar */}
-      {!isChatRoute && (
+      {!isImmersiveRoute && (
         <div className="hidden md:flex">
           <DesktopSidebar />
         </div>
@@ -27,7 +32,7 @@ export default function AppShell({ children }: AppShellProps) {
       {/* Main Content */}
       <div className="flex-1 flex flex-col h-full min-w-0 overflow-hidden">
         {/* Top Header (Contextual) */}
-        {!isChatRoute && (
+        {!isImmersiveRoute && (
           <header className="pt-safe h-16 border-b border-gray-200 bg-white flex items-center px-4 justify-between md:hidden shrink-0">
             <h1 className="font-semibold text-lg text-gray-900">VoiceID</h1>
             <div className="flex items-center gap-1">
@@ -43,13 +48,13 @@ export default function AppShell({ children }: AppShellProps) {
           </header>
         )}
         
-        <main className="flex-1 overflow-y-auto overflow-x-hidden pb-[calc(5rem+env(safe-area-inset-bottom,0px))] md:pb-0">
+        <main className={`flex-1 overflow-y-auto overflow-x-hidden ${isImmersiveRoute ? '' : 'pb-[calc(5rem+env(safe-area-inset-bottom,0px))] md:pb-0'}`}>
           {children}
         </main>
       </div>
       
       {/* Mobile Bottom Nav */}
-      {!isChatRoute && (
+      {!isImmersiveRoute && (
         <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 pb-safe bg-white">
           <MobileBottomNav />
         </div>

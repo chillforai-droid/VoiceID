@@ -1,13 +1,19 @@
 import { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Send, Smile, UserPlus, Copy, Check, LogOut, Crown } from 'lucide-react';
+import { ArrowLeft, Send, UserPlus, Copy, Check, LogOut, Crown } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
-import { useRoomChat } from '../hooks/useRoomChat';
+import { useRoomChat, type RoomMessage } from '../hooks/useRoomChat';
 import { useRooms, usePendingRoomRequests } from '../hooks/useRooms';
 import { relativeTime } from '../lib/timeFormat';
 
 const QUICK_EMOJIS = ['👍', '❤️', '😂', '🎉', '😮', '🙏'];
+
+interface FloatingReaction {
+  id: string;
+  emoji: string;
+  left: number;
+}
 
 export default function RoomPage() {
   const { id } = useParams<{ id: string }>();
@@ -19,11 +25,12 @@ export default function RoomPage() {
 
   const [room, setRoom] = useState<any>(null);
   const [input, setInput] = useState('');
-  const [showEmoji, setShowEmoji] = useState(false);
   const [showInvite, setShowInvite] = useState(false);
   const [showMembers, setShowMembers] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [floatingReactions, setFloatingReactions] = useState<FloatingReaction[]>([]);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const seenEmojiIds = useRef<Set<string> | null>(null);
 
   useEffect(() => {
     if (!id) return;
@@ -33,9 +40,35 @@ export default function RoomPage() {
     });
   }, [id]);
 
+  // Text messages render in the chat feed; emoji "messages" are reactions —
+  // they still land in room_messages (so history/realtime stays uniform),
+  // but in the UI they float up over the stage instead of sitting in the
+  // feed, like a live room's reaction stream.
+  const textMessages = messages.filter(m => m.content_type !== 'emoji');
+
+  useEffect(() => {
+    const emojiMessages = messages.filter(m => m.content_type === 'emoji');
+    if (seenEmojiIds.current === null) {
+      // First load: mark existing emoji history as seen so it doesn't
+      // replay as floating reactions on mount.
+      seenEmojiIds.current = new Set(emojiMessages.map(m => m.id));
+      return;
+    }
+    const fresh = emojiMessages.filter(m => !seenEmojiIds.current!.has(m.id));
+    if (!fresh.length) return;
+    for (const m of fresh) seenEmojiIds.current.add(m.id);
+    setFloatingReactions(prev => [
+      ...prev,
+      ...fresh.map(m => ({ id: m.id, emoji: m.content, left: 10 + Math.random() * 80 })),
+    ]);
+    fresh.forEach(m => {
+      setTimeout(() => setFloatingReactions(prev => prev.filter(r => r.id !== m.id)), 2200);
+    });
+  }, [messages]);
+
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages.length]);
+  }, [textMessages.length]);
 
   const isOwner = room && user && room.owner_id === user.id;
   const activeMembers = members.filter(m => m.status === 'active');
@@ -53,7 +86,6 @@ export default function RoomPage() {
   };
 
   const handleEmoji = async (emoji: string) => {
-    setShowEmoji(false);
     try {
       await sendMessage(emoji, 'emoji');
     } catch (err) {
@@ -78,30 +110,77 @@ export default function RoomPage() {
   if (!id) return null;
 
   return (
-    <div className="flex flex-col h-[calc(100vh-4rem)] sm:h-screen max-w-2xl mx-auto">
-      <div className="flex items-center gap-3 p-4 border-b border-gray-100 bg-white">
-        <button onClick={() => navigate('/dashboard/rooms')} className="text-gray-500 hover:text-gray-700">
-          <ArrowLeft size={20} />
-        </button>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-1.5">
-            <h1 className="font-semibold text-gray-900 truncate">{room?.name || 'Room'}</h1>
-            {isOwner && <Crown size={14} className="text-amber-500 shrink-0" />}
+    <div className="flex flex-col h-full max-w-2xl mx-auto bg-white">
+      <style>{`
+        @keyframes floatUpFade {
+          0% { transform: translateY(0) scale(0.6); opacity: 0; }
+          15% { transform: translateY(-10px) scale(1.1); opacity: 1; }
+          100% { transform: translateY(-90px) scale(1); opacity: 0; }
+        }
+        .float-reaction { animation: floatUpFade 2.2s ease-out forwards; }
+      `}</style>
+
+      {/* Stage: room identity + live avatar row, gradient like a live room rather than a plain chat header */}
+      <div className="relative bg-gradient-to-br from-indigo-600 via-purple-600 to-purple-700 px-4 pt-[calc(0.75rem+env(safe-area-inset-top,0px))] pb-4 shrink-0 overflow-hidden">
+        <div className="flex items-center gap-3">
+          <button onClick={() => navigate('/dashboard/rooms')} className="text-white/90 hover:text-white shrink-0" aria-label="Back">
+            <ArrowLeft size={20} />
+          </button>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-red-400 animate-pulse shrink-0" />
+              <h1 className="font-semibold text-white truncate">{room?.name || 'Room'}</h1>
+              {isOwner && <Crown size={14} className="text-amber-300 shrink-0" />}
+            </div>
+            <p className="text-xs text-white/70">{activeMembers.length} in room</p>
           </div>
-          <button onClick={() => setShowMembers(true)} className="text-xs text-gray-500 hover:text-blue-600">
-            {activeMembers.length} member{activeMembers.length !== 1 ? 's' : ''}
+          <button onClick={() => setShowInvite(true)} className="p-2 text-white/90 hover:text-white shrink-0" aria-label="Invite">
+            <UserPlus size={20} />
+          </button>
+          <button onClick={handleLeave} className="p-2 text-white/90 hover:text-white shrink-0" aria-label="Leave room">
+            <LogOut size={20} />
           </button>
         </div>
-        <button onClick={() => setShowInvite(true)} className="p-2 text-gray-500 hover:text-blue-600" aria-label="Invite">
-          <UserPlus size={20} />
+
+        <button
+          onClick={() => setShowMembers(true)}
+          className="mt-3 flex items-center gap-2 overflow-x-auto w-full"
+        >
+          {activeMembers.slice(0, 10).map(m => (
+            <div key={m.id} className="shrink-0 flex flex-col items-center gap-1 w-14">
+              {m.avatar_url ? (
+                <img src={m.avatar_url} className="w-11 h-11 rounded-full object-cover ring-2 ring-white/50" alt={m.username} />
+              ) : (
+                <div className="w-11 h-11 rounded-full bg-white/20 text-white flex items-center justify-center text-sm font-bold ring-2 ring-white/50">
+                  {(m.display_name || m.username).charAt(0).toUpperCase()}
+                </div>
+              )}
+              <span className="text-[10px] text-white/80 truncate w-full text-center">{m.display_name || m.username}</span>
+            </div>
+          ))}
+          {activeMembers.length > 10 && (
+            <div className="shrink-0 w-11 h-11 rounded-full bg-white/15 text-white flex items-center justify-center text-xs font-semibold ring-2 ring-white/40">
+              +{activeMembers.length - 10}
+            </div>
+          )}
         </button>
-        <button onClick={handleLeave} className="p-2 text-gray-500 hover:text-red-600" aria-label="Leave room">
-          <LogOut size={20} />
-        </button>
+
+        {/* Floating emoji reactions rise up over the stage */}
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-24 overflow-hidden">
+          {floatingReactions.map(r => (
+            <span
+              key={r.id}
+              className="float-reaction absolute bottom-2 text-3xl"
+              style={{ left: `${r.left}%` }}
+            >
+              {r.emoji}
+            </span>
+          ))}
+        </div>
       </div>
 
       {isOwner && requests.length > 0 && (
-        <div className="bg-amber-50 border-b border-amber-100 px-4 py-2 space-y-2">
+        <div className="bg-amber-50 border-b border-amber-100 px-4 py-2 space-y-2 shrink-0">
           {requests.map(req => (
             <div key={req.id} className="flex items-center justify-between gap-2 text-sm">
               <span className="text-gray-800 truncate">
@@ -116,32 +195,32 @@ export default function RoomPage() {
         </div>
       )}
 
-      <div className="flex-1 overflow-y-auto p-4 space-y-3">
+      {/* Live chat feed — compact game/stream-style rows, not 1:1 message bubbles */}
+      <div className="flex-1 overflow-y-auto px-3 py-3 space-y-1.5 bg-gray-50">
         {loading ? (
           <div className="text-center text-gray-400 py-10">Loading...</div>
-        ) : messages.length === 0 ? (
-          <div className="text-center text-gray-400 py-10 text-sm">Abhi koi message nahi. Baat shuru karein!</div>
+        ) : textMessages.length === 0 ? (
+          <div className="text-center text-gray-400 py-10 text-sm">
+            Abhi koi message nahi. Baat shuru karein — emoji bhi bhej sakte hain, wo upar float hoga!
+          </div>
         ) : (
-          messages.map(msg => {
+          textMessages.map((msg: RoomMessage) => {
             const mine = msg.sender_id === user?.id;
             return (
-              <div key={msg.id} className={`flex ${mine ? 'justify-end' : 'justify-start'}`}>
-                <div className={`max-w-[75%] ${mine ? 'items-end' : 'items-start'} flex flex-col`}>
-                  {!mine && (
-                    <span className="text-xs text-gray-400 mb-0.5 px-1">
-                      {msg.sender?.display_name || msg.sender?.username || 'Member'}
-                    </span>
-                  )}
-                  <div
-                    className={
-                      msg.content_type === 'emoji'
-                        ? 'text-3xl leading-none px-1'
-                        : `px-4 py-2 rounded-2xl text-sm ${mine ? 'bg-blue-600 text-white rounded-br-sm' : 'bg-gray-100 text-gray-900 rounded-bl-sm'}`
-                    }
-                  >
-                    {msg.content}
+              <div key={msg.id} className="flex items-start gap-2 px-1.5 py-1 rounded-lg hover:bg-white/60">
+                {msg.sender?.avatar_url ? (
+                  <img src={msg.sender.avatar_url} className="w-7 h-7 rounded-full object-cover shrink-0 mt-0.5" alt="" />
+                ) : (
+                  <div className="w-7 h-7 rounded-full bg-purple-100 text-purple-600 flex items-center justify-center text-[11px] font-bold shrink-0 mt-0.5">
+                    {(msg.sender?.display_name || msg.sender?.username || '?').charAt(0).toUpperCase()}
                   </div>
-                  <span className="text-[10px] text-gray-400 mt-0.5 px-1">{relativeTime(msg.created_at)}</span>
+                )}
+                <div className="min-w-0 flex-1">
+                  <span className={`text-sm font-semibold mr-1.5 ${mine ? 'text-blue-600' : 'text-purple-700'}`}>
+                    {mine ? 'You' : (msg.sender?.display_name || msg.sender?.username || 'Member')}
+                  </span>
+                  <span className="text-sm text-gray-800 break-words">{msg.content}</span>
+                  <span className="text-[10px] text-gray-400 ml-1.5">{relativeTime(msg.created_at)}</span>
                 </div>
               </div>
             );
@@ -150,20 +229,21 @@ export default function RoomPage() {
         <div ref={bottomRef} />
       </div>
 
-      <div className="p-3 border-t border-gray-100 bg-white relative">
-        {showEmoji && (
-          <div className="absolute bottom-full left-3 mb-2 bg-white border border-gray-200 rounded-2xl shadow-lg p-2 flex gap-1">
-            {QUICK_EMOJIS.map(e => (
-              <button key={e} onClick={() => handleEmoji(e)} className="text-2xl p-1.5 hover:bg-gray-100 rounded-lg">
-                {e}
-              </button>
-            ))}
-          </div>
-        )}
-        <div className="flex items-center gap-2">
-          <button onClick={() => setShowEmoji(v => !v)} className="p-2.5 text-gray-500 hover:text-blue-600 shrink-0" aria-label="Emoji">
-            <Smile size={22} />
+      {/* Always-visible reaction strip, like a live stream's quick-react bar */}
+      <div className="flex items-center gap-1.5 px-3 pt-2 bg-white border-t border-gray-100 shrink-0">
+        {QUICK_EMOJIS.map(e => (
+          <button
+            key={e}
+            onClick={() => handleEmoji(e)}
+            className="text-xl p-1.5 rounded-full hover:bg-gray-100 active:scale-90 transition-transform"
+          >
+            {e}
           </button>
+        ))}
+      </div>
+
+      <div className="p-3 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))] bg-white shrink-0">
+        <div className="flex items-center gap-2">
           <input
             value={input}
             onChange={e => setInput(e.target.value)}
