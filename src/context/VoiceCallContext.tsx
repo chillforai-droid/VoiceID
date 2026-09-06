@@ -26,7 +26,7 @@ interface VoiceCallContextType {
 
 const VoiceCallContext = createContext<VoiceCallContextType>({} as VoiceCallContextType);
 
-function buildIceServers() {
+export function buildIceServers() {
   const urls = (import.meta.env.VITE_TURN_URLS || import.meta.env.VITE_TURN_URL || '')
     .split(',')
     .map((v: string) => v.trim())

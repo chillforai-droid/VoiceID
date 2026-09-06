@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Send, UserPlus, Copy, Check, LogOut, Crown } from 'lucide-react';
+import { ArrowLeft, Send, UserPlus, Copy, Check, LogOut, Crown, Mic, MicOff, PhoneOff } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { useRoomChat, type RoomMessage } from '../hooks/useRoomChat';
 import { useRooms, usePendingRoomRequests } from '../hooks/useRooms';
+import { useRoomVoiceCall } from '../hooks/useRoomVoiceCall';
 import { relativeTime } from '../lib/timeFormat';
 
 const QUICK_EMOJIS = ['👍', '❤️', '😂', '🎉', '😮', '🙏'];
@@ -22,6 +23,7 @@ export default function RoomPage() {
   const { messages, members, loading, sendMessage } = useRoomChat(id);
   const { leaveRoom, inviteByUserId } = useRooms();
   const { requests, respond } = usePendingRoomRequests(id);
+  const { inVoice, connecting, isMuted, voicePresentIds, remoteStreams, joinVoice, leaveVoice, toggleMute } = useRoomVoiceCall(id);
 
   const [room, setRoom] = useState<any>(null);
   const [input, setInput] = useState('');
@@ -95,6 +97,7 @@ export default function RoomPage() {
 
   const handleLeave = async () => {
     if (!id || !window.confirm('Room chhodna chahte hain?')) return;
+    await leaveVoice();
     await leaveRoom(id);
     navigate('/dashboard/rooms');
   };
@@ -111,6 +114,13 @@ export default function RoomPage() {
 
   return (
     <div className="flex flex-col h-full max-w-2xl mx-auto bg-white">
+      {Object.entries(remoteStreams).map(([peerId, stream]) => (
+        <audio
+          key={peerId}
+          autoPlay
+          ref={el => { if (el) el.srcObject = stream; }}
+        />
+      ))}
       <style>{`
         @keyframes floatUpFade {
           0% { transform: translateY(0) scale(0.6); opacity: 0; }
@@ -137,10 +147,27 @@ export default function RoomPage() {
           <button onClick={() => setShowInvite(true)} className="p-2 text-white/90 hover:text-white shrink-0" aria-label="Invite">
             <UserPlus size={20} />
           </button>
+          <button
+            onClick={() => (inVoice ? leaveVoice() : joinVoice())}
+            disabled={connecting}
+            className={`p-2 rounded-full shrink-0 ${inVoice ? 'bg-red-500 text-white' : 'text-white/90 hover:text-white'}`}
+            aria-label={inVoice ? 'Leave voice' : 'Join voice'}
+          >
+            {inVoice ? <PhoneOff size={20} /> : <Mic size={20} />}
+          </button>
           <button onClick={handleLeave} className="p-2 text-white/90 hover:text-white shrink-0" aria-label="Leave room">
             <LogOut size={20} />
           </button>
         </div>
+
+        {inVoice && (
+          <div className="mt-2 flex items-center gap-2 bg-white/10 rounded-xl px-3 py-1.5 w-fit">
+            <span className="text-xs text-white/90">🎙️ Voice me ho</span>
+            <button onClick={toggleMute} className="p-1 text-white/90 hover:text-white" aria-label={isMuted ? 'Unmute' : 'Mute'}>
+              {isMuted ? <MicOff size={16} /> : <Mic size={16} />}
+            </button>
+          </div>
+        )}
 
         <button
           onClick={() => setShowMembers(true)}
@@ -148,13 +175,20 @@ export default function RoomPage() {
         >
           {activeMembers.slice(0, 10).map(m => (
             <div key={m.id} className="shrink-0 flex flex-col items-center gap-1 w-14">
-              {m.avatar_url ? (
-                <img src={m.avatar_url} className="w-11 h-11 rounded-full object-cover ring-2 ring-white/50" alt={m.username} />
-              ) : (
-                <div className="w-11 h-11 rounded-full bg-white/20 text-white flex items-center justify-center text-sm font-bold ring-2 ring-white/50">
-                  {(m.display_name || m.username).charAt(0).toUpperCase()}
-                </div>
-              )}
+              <div className="relative">
+                {m.avatar_url ? (
+                  <img src={m.avatar_url} className="w-11 h-11 rounded-full object-cover ring-2 ring-white/50" alt={m.username} />
+                ) : (
+                  <div className="w-11 h-11 rounded-full bg-white/20 text-white flex items-center justify-center text-sm font-bold ring-2 ring-white/50">
+                    {(m.display_name || m.username).charAt(0).toUpperCase()}
+                  </div>
+                )}
+                {voicePresentIds.includes(m.user_id) && (
+                  <span className="absolute -bottom-0.5 -right-0.5 w-4 h-4 bg-green-500 rounded-full flex items-center justify-center ring-2 ring-purple-700">
+                    <Mic size={9} className="text-white" />
+                  </span>
+                )}
+              </div>
               <span className="text-[10px] text-white/80 truncate w-full text-center">{m.display_name || m.username}</span>
             </div>
           ))}
