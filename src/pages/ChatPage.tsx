@@ -41,6 +41,12 @@ export default function ChatPage() {
   const [otherUser, setOtherUser] = useState<any>(null);
   const [isNetworkOnline, setIsNetworkOnline] = useState(() => navigator.onLine);
   const [isOtherTyping, setIsOtherTyping] = useState(false);
+  // Set locally the moment we send something to an AI persona (the backend
+  // replies async via a DB webhook and never broadcasts a 'typing' event
+  // like a real user's client does), and cleared once their reply lands or
+  // a safety timeout passes.
+  const [aiThinking, setAiThinking] = useState(false);
+  const aiThinkingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [pendingCount, setPendingCount] = useState(0);
   const typingStopTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const remoteTypingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -67,6 +73,16 @@ export default function ChatPage() {
       event: 'typing',
       payload: { userId: user.id, typing },
     });
+  };
+
+  // Kicks off the "AI is typing" bubble right after we send it something.
+  // 30s safety timeout in case the reply never lands (rate limit, both LLM
+  // providers down, etc.) so the bubble doesn't hang forever.
+  const startAiThinking = () => {
+    if (!otherUser?.profiles?.is_ai) return;
+    setAiThinking(true);
+    if (aiThinkingTimer.current) clearTimeout(aiThinkingTimer.current);
+    aiThinkingTimer.current = setTimeout(() => setAiThinking(false), 30000);
   };
 
   const handleTyping = (value: string) => {
@@ -188,6 +204,8 @@ export default function ChatPage() {
         markFailed('Could not save the message. Please try again.');
         return;
       }
+
+      startAiThinking();
 
       // Cache the blob under the same id used above, so the fetch path
       // ImageMessage falls back to (once _previewUrl is dropped) hits the
@@ -317,6 +335,10 @@ export default function ChatPage() {
           if (prev.find(m => m.id === message.id)) return prev.map(m => m.id === message.id ? message : m);
           return [...prev, message].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
         });
+        if (message.sender_id !== user.id) {
+          if (aiThinkingTimer.current) clearTimeout(aiThinkingTimer.current);
+          setAiThinking(false);
+        }
       })
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'messages', filter: `conversation_id=eq.${id}` }, async (payload) => {
         const message = payload.new as any;
@@ -350,8 +372,10 @@ export default function ChatPage() {
       cancelled = true;
       if (typingStopTimer.current) clearTimeout(typingStopTimer.current);
       if (remoteTypingTimer.current) clearTimeout(remoteTypingTimer.current);
+      if (aiThinkingTimer.current) clearTimeout(aiThinkingTimer.current);
       sendTypingState(false);
       setIsOtherTyping(false);
+      setAiThinking(false);
       channelRef.current = null;
       supabase.removeChannel(subscription);
     };
@@ -362,7 +386,7 @@ export default function ChatPage() {
     void flushOutbox();
   }, [isNetworkOnline, id, user]);
 
-  useEffect(() => { scrollRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
+  useEffect(() => { scrollRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages, aiThinking]);
 
   // This is the fix for "double tick nahi dikhta": the recipient's browser
   // never told the sender the message had been seen, because nothing in
@@ -435,6 +459,7 @@ export default function ChatPage() {
     setMessages(prev => [...prev, localMessage]);
     await OfflineMessageStore.queueMessage(localMessage);
     setPendingCount((count) => count + 1);
+    startAiThinking();
 
     if (navigator.onLine) {
       await flushOutbox();
@@ -446,6 +471,7 @@ export default function ChatPage() {
   // instead of waiting on the realtime INSERT event to round-trip back.
   const handleVoiceMessageSent = (message: any) => {
     setMessages(prev => prev.find(m => m.id === message.id) ? prev : [...prev, message]);
+    startAiThinking();
   };
 
   const deleteMessage = async (m: any) => {
@@ -528,7 +554,7 @@ export default function ChatPage() {
           </div>
           <div className="text-xs min-h-4 truncate">
             {otherUser?.profiles?.is_ai ? (
-              isOtherTyping ? <span className="text-blue-600 font-medium">typing...</span> : <span className="text-gray-400">AI companion</span>
+              isOtherTyping || aiThinking ? <span className="text-blue-600 font-medium">typing...</span> : <span className="text-gray-400">AI companion</span>
             ) : isOtherTyping ? <span className="text-blue-600 font-medium">typing...</span> : isNetworkOnline ? (isUserOnline(otherUser?.user_id) ? <span className="text-green-600">online</span> : <span className="text-gray-400">offline</span>) : <span className="text-amber-600">You’re offline · messages will send when online</span>}
           </div>
         </div>
@@ -587,6 +613,15 @@ export default function ChatPage() {
           />
           );
         })}
+        {aiThinking && (
+          <div className="flex justify-start">
+            <div className="bg-gray-200 rounded-2xl rounded-bl-sm px-4 py-3 flex gap-1.5 items-center w-fit">
+              <span className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+              <span className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+              <span className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+            </div>
+          </div>
+        )}
         <div ref={scrollRef} />
       </div>
       

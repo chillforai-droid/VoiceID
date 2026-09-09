@@ -9,10 +9,25 @@ export interface RoomSummary {
   room_code: string;
   owner_id: string;
   is_active: boolean;
+  is_public: boolean;
+  category: string | null;
   created_at: string;
   my_role: 'owner' | 'member';
   member_count: number;
 }
+
+export interface PublicRoom {
+  id: string;
+  name: string;
+  description: string | null;
+  category: string | null;
+  owner_name: string;
+  member_count: number;
+  my_status: string | null;
+  created_at: string;
+}
+
+export const ROOM_CATEGORIES = ['General', 'Music', 'Gaming', 'Study', 'Just Chatting'] as const;
 
 export interface PendingRequest {
   id: string; // room_members.id
@@ -90,14 +105,21 @@ export function useRooms() {
 
   useEffect(() => { fetchRooms(); }, [fetchRooms]);
 
-  const createRoom = useCallback(async (name: string, description?: string) => {
+  const createRoom = useCallback(async (name: string, description?: string, isPublic = false, category?: string) => {
     if (!user) throw new Error('Not signed in');
     let lastError: any = null;
     // room_code is unique; retry a couple of times on the rare collision.
     for (let attempt = 0; attempt < 3; attempt++) {
       const { data, error } = await supabase
         .from('rooms')
-        .insert({ owner_id: user.id, name: name.trim(), description: description?.trim() || null, room_code: generateRoomCode() })
+        .insert({
+          owner_id: user.id,
+          name: name.trim(),
+          description: description?.trim() || null,
+          room_code: generateRoomCode(),
+          is_public: isPublic,
+          category: isPublic ? (category || 'General') : null,
+        })
         .select()
         .single();
       if (!error) {
@@ -129,6 +151,31 @@ export function useRooms() {
     if (error) throw error;
   }, [user]);
 
+  const requestToJoin = useCallback(async (roomId: string) => {
+    if (!user) throw new Error('Not signed in');
+    const { data: inserted, error } = await supabase
+      .from('room_members')
+      .insert({ room_id: roomId, user_id: user.id, role: 'member', status: 'pending' })
+      .select('id')
+      .single();
+    if (error) throw error;
+
+    // Public rooms get auto-approved by a DB trigger right after insert —
+    // RETURNING on the insert won't see that (it runs in an AFTER
+    // trigger), so re-read the row to know whether we're actually in now.
+    const { data: current } = await supabase
+      .from('room_members')
+      .select('status')
+      .eq('id', inserted.id)
+      .single();
+
+    if (current?.status === 'active') {
+      await fetchRooms();
+      return { joined: true, roomId };
+    }
+    return { requested: true, roomId };
+  }, [user, fetchRooms]);
+
   const joinByCode = useCallback(async (code: string) => {
     if (!user) throw new Error('Not signed in');
     const { data, error } = await supabase.rpc('find_room_by_code', { p_code: code.trim() });
@@ -149,14 +196,36 @@ export function useRooms() {
       return { joined: true, roomId: room.id };
     }
 
-    const { error: reqError } = await supabase
-      .from('room_members')
-      .insert({ room_id: room.id, user_id: user.id, role: 'member', status: 'pending' });
-    if (reqError) throw reqError;
-    return { requested: true, roomId: room.id, roomName: room.name };
-  }, [user, fetchRooms]);
+    const result = await requestToJoin(room.id);
+    return result.joined
+      ? { joined: true, roomId: room.id }
+      : { requested: true, roomId: room.id, roomName: room.name };
+  }, [user, fetchRooms, requestToJoin]);
 
-  return { rooms, loading, fetchRooms, createRoom, leaveRoom, inviteByUserId, joinByCode };
+  return { rooms, loading, fetchRooms, createRoom, leaveRoom, inviteByUserId, joinByCode, requestToJoin };
+}
+
+/** Public rooms for the Explore tab. */
+export function usePublicRooms(category?: string) {
+  const [rooms, setRooms] = useState<PublicRoom[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const fetchPublicRooms = useCallback(async () => {
+    setLoading(true);
+    const { data, error } = await supabase.rpc('list_public_rooms', { p_category: category || null });
+    if (error) {
+      console.error('Failed to load public rooms:', error);
+      setRooms([]);
+      setLoading(false);
+      return;
+    }
+    setRooms(data ?? []);
+    setLoading(false);
+  }, [category]);
+
+  useEffect(() => { fetchPublicRooms(); }, [fetchPublicRooms]);
+
+  return { rooms, loading, fetchPublicRooms };
 }
 
 /** Pending join requests for rooms the current user owns. */
