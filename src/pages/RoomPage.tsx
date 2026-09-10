@@ -1,12 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Send, UserPlus, Copy, Check, LogOut, Crown, Mic, MicOff, PhoneOff } from 'lucide-react';
+import { ArrowLeft, Send, UserPlus, Copy, Check, LogOut, Crown, Mic, MicOff, PhoneOff, ImagePlus } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { useRoomChat, type RoomMessage } from '../hooks/useRoomChat';
 import { useRooms, usePendingRoomRequests } from '../hooks/useRooms';
 import { useRoomVoiceCall } from '../hooks/useRoomVoiceCall';
 import { relativeTime } from '../lib/timeFormat';
+import { linkify } from '../lib/linkify';
+import RoomImageMessage from '../components/room/RoomImageMessage';
 
 const QUICK_EMOJIS = ['👍', '❤️', '😂', '🎉', '😮', '🙏'];
 
@@ -20,7 +22,7 @@ export default function RoomPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { messages, members, loading, sendMessage } = useRoomChat(id);
+  const { messages, members, loading, sendMessage, sendImageMessage } = useRoomChat(id);
   const { leaveRoom, inviteByUserId } = useRooms();
   const { requests, respond } = usePendingRoomRequests(id);
   const { inVoice, connecting, isMuted, voicePresentIds, remoteStreams, joinVoice, leaveVoice, toggleMute } = useRoomVoiceCall(id);
@@ -33,6 +35,7 @@ export default function RoomPage() {
   const [floatingReactions, setFloatingReactions] = useState<FloatingReaction[]>([]);
   const bottomRef = useRef<HTMLDivElement>(null);
   const seenEmojiIds = useRef<Set<string> | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!id) return;
@@ -92,6 +95,19 @@ export default function RoomPage() {
       await sendMessage(emoji, 'emoji');
     } catch (err) {
       console.error('Failed to send emoji:', err);
+    }
+  };
+
+  const handleImagePicked = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    const caption = input;
+    setInput('');
+    try {
+      await sendImageMessage(file, caption);
+    } catch (err) {
+      console.error('Failed to send image:', err);
     }
   };
 
@@ -240,6 +256,7 @@ export default function RoomPage() {
         ) : (
           textMessages.map((msg: RoomMessage) => {
             const mine = msg.sender_id === user?.id;
+            const isImage = msg.content_type === 'image';
             return (
               <div key={msg.id} className="flex items-start gap-2 px-1.5 py-1 rounded-lg hover:bg-white/60">
                 {msg.sender?.avatar_url ? (
@@ -250,11 +267,25 @@ export default function RoomPage() {
                   </div>
                 )}
                 <div className="min-w-0 flex-1">
-                  <span className={`text-sm font-semibold mr-1.5 ${mine ? 'text-blue-600' : 'text-purple-700'}`}>
-                    {mine ? 'You' : (msg.sender?.display_name || msg.sender?.username || 'Member')}
-                  </span>
-                  <span className="text-sm text-gray-800 break-words">{msg.content}</span>
-                  <span className="text-[10px] text-gray-400 ml-1.5">{relativeTime(msg.created_at)}</span>
+                  <div className="mb-0.5">
+                    <span className={`text-sm font-semibold mr-1.5 ${mine ? 'text-blue-600' : 'text-purple-700'}`}>
+                      {mine ? 'You' : (msg.sender?.display_name || msg.sender?.username || 'Member')}
+                    </span>
+                    {!isImage && <span className="text-[10px] text-gray-400">{relativeTime(msg.created_at)}</span>}
+                  </div>
+                  {isImage ? (
+                    <div className="max-w-xs rounded-xl overflow-hidden border border-gray-200 bg-white shadow-sm">
+                      <RoomImageMessage message={msg} />
+                      {msg.content && (
+                        <div className="px-3 py-2 text-sm text-gray-800 whitespace-pre-wrap break-words">
+                          {linkify(msg.content)}
+                        </div>
+                      )}
+                      <div className="px-3 pb-1.5 text-[10px] text-gray-400">{relativeTime(msg.created_at)}</div>
+                    </div>
+                  ) : (
+                    <span className="text-sm text-gray-800 break-words">{linkify(msg.content)}</span>
+                  )}
                 </div>
               </div>
             );
@@ -278,6 +309,14 @@ export default function RoomPage() {
 
       <div className="p-3 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))] bg-white shrink-0">
         <div className="flex items-center gap-2">
+          <input type="file" ref={fileInputRef} onChange={handleImagePicked} accept="image/*" className="hidden" />
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            className="p-2.5 text-gray-500 hover:text-blue-600 shrink-0"
+            aria-label="Send image"
+          >
+            <ImagePlus size={22} />
+          </button>
           <input
             value={input}
             onChange={e => setInput(e.target.value)}

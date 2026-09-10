@@ -29,6 +29,10 @@
       "destination": "/api/story-media"
     },
     {
+      "source": "/api/media/room",
+      "destination": "/api/room-media"
+    },
+    {
       "source": "/u/:username",
       "destination": "/api/profile-og"
     },

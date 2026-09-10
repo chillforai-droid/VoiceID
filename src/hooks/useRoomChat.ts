@@ -1,15 +1,24 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
+import { uploadMediaWithRetry } from '../lib/uploadMediaWithRetry';
 
 export interface RoomMessage {
   id: string;
   room_id: string;
   sender_id: string;
-  content_type: 'text' | 'emoji';
+  content_type: 'text' | 'emoji' | 'image';
   content: string;
   created_at: string;
+  b2_object_key?: string | null;
+  mime_type?: string | null;
+  byte_size?: number | null;
   sender?: { username: string; display_name: string | null; avatar_url: string | null };
+  // Client-only: set while an image the current user just picked is still
+  // uploading, so their own bubble can render instantly (see sendImageMessage).
+  _previewUrl?: string;
+  _uploading?: boolean;
+  _failed?: boolean;
 }
 
 export interface RoomMemberRow {
@@ -116,5 +125,47 @@ export function useRoomChat(roomId: string | undefined) {
     if (error) throw error;
   }, [roomId, user]);
 
-  return { messages, members, loading, sendMessage };
+  const sendImageMessage = useCallback(async (file: File, caption: string) => {
+    if (!roomId || !user) return;
+    const messageId = crypto.randomUUID();
+    const previewUrl = URL.createObjectURL(file);
+
+    // Optimistic bubble: shows immediately with the exact file the sender
+    // picked, instead of waiting on the upload + realtime round-trip.
+    const localMessage: RoomMessage = {
+      id: messageId,
+      room_id: roomId,
+      sender_id: user.id,
+      content_type: 'image',
+      content: caption.trim(),
+      created_at: new Date().toISOString(),
+      mime_type: file.type,
+      byte_size: file.size,
+      sender: undefined,
+      _previewUrl: previewUrl,
+      _uploading: true,
+    };
+    setMessages(prev => [...prev, localMessage]);
+
+    try {
+      const objectKey = await uploadMediaWithRetry(file, file.type);
+      const { error } = await supabase.from('room_messages').insert({
+        id: messageId,
+        room_id: roomId,
+        sender_id: user.id,
+        content_type: 'image',
+        content: caption.trim(),
+        b2_object_key: objectKey,
+        mime_type: file.type,
+        byte_size: file.size,
+      });
+      if (error) throw error;
+      setMessages(prev => prev.map(m => m.id === messageId ? { ...m, b2_object_key: objectKey, _uploading: false } : m));
+    } catch (err) {
+      console.error('Failed to send room image:', err);
+      setMessages(prev => prev.map(m => m.id === messageId ? { ...m, _uploading: false, _failed: true } : m));
+    }
+  }, [roomId, user]);
+
+  return { messages, members, loading, sendMessage, sendImageMessage };
 }
