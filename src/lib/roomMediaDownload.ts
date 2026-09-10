@@ -16,7 +16,7 @@ export async function getRoomImageUrl(messageId: string): Promise<string> {
   const res = await fetch('/api/media/room', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-    body: JSON.stringify({ messageId }),
+    body: JSON.stringify({ messageId, source: 'room' }),
   });
 
   if (!res.ok) {

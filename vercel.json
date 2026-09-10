@@ -30,7 +30,7 @@
     },
     {
       "source": "/api/media/room",
-      "destination": "/api/room-media"
+      "destination": "/api/download"
     },
     {
       "source": "/u/:username",
