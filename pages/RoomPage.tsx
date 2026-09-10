@@ -1,12 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Send, UserPlus, Copy, Check, LogOut, Crown, Mic, MicOff, PhoneOff } from 'lucide-react';
+import { ArrowLeft, Send, UserPlus, Copy, Check, LogOut, Crown, Mic, MicOff, PhoneOff, ImagePlus, X } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { useRoomChat, type RoomMessage } from '../hooks/useRoomChat';
 import { useRooms, usePendingRoomRequests } from '../hooks/useRooms';
 import { useRoomVoiceCall } from '../hooks/useRoomVoiceCall';
 import { relativeTime } from '../lib/timeFormat';
+import { linkify } from '../lib/linkify';
+import RoomImageMessage from '../components/room/RoomImageMessage';
 
 const QUICK_EMOJIS = ['👍', '❤️', '😂', '🎉', '😮', '🙏'];
 
@@ -20,7 +22,7 @@ export default function RoomPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { messages, members, loading, sendMessage } = useRoomChat(id);
+  const { messages, members, loading, sendMessage, sendImageMessage } = useRoomChat(id);
   const { leaveRoom, inviteByUserId } = useRooms();
   const { requests, respond } = usePendingRoomRequests(id);
   const { inVoice, connecting, isMuted, voicePresentIds, remoteStreams, joinVoice, leaveVoice, toggleMute } = useRoomVoiceCall(id);
@@ -31,8 +33,10 @@ export default function RoomPage() {
   const [showMembers, setShowMembers] = useState(false);
   const [copied, setCopied] = useState(false);
   const [floatingReactions, setFloatingReactions] = useState<FloatingReaction[]>([]);
+  const [pendingImage, setPendingImage] = useState<{ file: File; previewUrl: string } | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const seenEmojiIds = useRef<Set<string> | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!id) return;
@@ -72,10 +76,28 @@ export default function RoomPage() {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [textMessages.length]);
 
+  useEffect(() => {
+    // Revoke the staged-image preview URL when the room changes or the page unmounts.
+    return () => { if (pendingImage) URL.revokeObjectURL(pendingImage.previewUrl); };
+  }, [id]);
+
   const isOwner = room && user && room.owner_id === user.id;
   const activeMembers = members.filter(m => m.status === 'active');
 
   const handleSend = async () => {
+    if (pendingImage) {
+      const { file } = pendingImage;
+      const caption = input;
+      setInput('');
+      URL.revokeObjectURL(pendingImage.previewUrl);
+      setPendingImage(null);
+      try {
+        await sendImageMessage(file, caption);
+      } catch (err) {
+        console.error('Failed to send image:', err);
+      }
+      return;
+    }
     if (!input.trim()) return;
     const value = input;
     setInput('');
@@ -93,6 +115,19 @@ export default function RoomPage() {
     } catch (err) {
       console.error('Failed to send emoji:', err);
     }
+  };
+
+  const handleImagePicked = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    if (pendingImage) URL.revokeObjectURL(pendingImage.previewUrl);
+    setPendingImage({ file, previewUrl: URL.createObjectURL(file) });
+  };
+
+  const cancelPendingImage = () => {
+    if (pendingImage) URL.revokeObjectURL(pendingImage.previewUrl);
+    setPendingImage(null);
   };
 
   const handleLeave = async () => {
@@ -240,6 +275,7 @@ export default function RoomPage() {
         ) : (
           textMessages.map((msg: RoomMessage) => {
             const mine = msg.sender_id === user?.id;
+            const isImage = msg.content_type === 'image';
             return (
               <div key={msg.id} className="flex items-start gap-2 px-1.5 py-1 rounded-lg hover:bg-white/60">
                 {msg.sender?.avatar_url ? (
@@ -250,11 +286,25 @@ export default function RoomPage() {
                   </div>
                 )}
                 <div className="min-w-0 flex-1">
-                  <span className={`text-sm font-semibold mr-1.5 ${mine ? 'text-blue-600' : 'text-purple-700'}`}>
-                    {mine ? 'You' : (msg.sender?.display_name || msg.sender?.username || 'Member')}
-                  </span>
-                  <span className="text-sm text-gray-800 break-words">{msg.content}</span>
-                  <span className="text-[10px] text-gray-400 ml-1.5">{relativeTime(msg.created_at)}</span>
+                  <div className="mb-0.5">
+                    <span className={`text-sm font-semibold mr-1.5 ${mine ? 'text-blue-600' : 'text-purple-700'}`}>
+                      {mine ? 'You' : (msg.sender?.display_name || msg.sender?.username || 'Member')}
+                    </span>
+                    {!isImage && <span className="text-[10px] text-gray-400">{relativeTime(msg.created_at)}</span>}
+                  </div>
+                  {isImage ? (
+                    <div className="max-w-xs rounded-xl overflow-hidden border border-gray-200 bg-white shadow-sm">
+                      <RoomImageMessage message={msg} />
+                      {msg.content && (
+                        <div className="px-3 py-2 text-sm text-gray-800 whitespace-pre-wrap break-words">
+                          {linkify(msg.content)}
+                        </div>
+                      )}
+                      <div className="px-3 pb-1.5 text-[10px] text-gray-400">{relativeTime(msg.created_at)}</div>
+                    </div>
+                  ) : (
+                    <span className="text-sm text-gray-800 break-words">{linkify(msg.content)}</span>
+                  )}
                 </div>
               </div>
             );
@@ -277,17 +327,34 @@ export default function RoomPage() {
       </div>
 
       <div className="p-3 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))] bg-white shrink-0">
+        {pendingImage && (
+          <div className="flex items-center gap-2 mb-2 p-2 bg-gray-50 border border-gray-200 rounded-xl">
+            <img src={pendingImage.previewUrl} className="w-12 h-12 rounded-lg object-cover shrink-0" alt="" />
+            <span className="text-xs text-gray-500 flex-1">Caption likh sakte hain, phir Send dabayein</span>
+            <button onClick={cancelPendingImage} className="p-1.5 text-gray-400 hover:text-red-500 shrink-0" aria-label="Cancel image">
+              <X size={18} />
+            </button>
+          </div>
+        )}
         <div className="flex items-center gap-2">
+          <input type="file" ref={fileInputRef} onChange={handleImagePicked} accept="image/*" className="hidden" />
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            className="p-2.5 text-gray-500 hover:text-blue-600 shrink-0"
+            aria-label="Attach image"
+          >
+            <ImagePlus size={22} />
+          </button>
           <input
             value={input}
             onChange={e => setInput(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter') handleSend(); }}
-            placeholder="Message likhein..."
+            placeholder={pendingImage ? 'Caption (optional)...' : 'Message likhein...'}
             className="flex-1 px-4 py-2.5 bg-gray-100 rounded-full focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm min-w-0"
           />
           <button
             onClick={handleSend}
-            disabled={!input.trim()}
+            disabled={!pendingImage && !input.trim()}
             className="p-2.5 bg-blue-600 text-white rounded-full disabled:opacity-40 shrink-0"
             aria-label="Send"
           >
