@@ -1,4 +1,4 @@
-const CACHE = 'voiceid-shell-v1';
+const CACHE = 'voiceid-shell-v2';
 const APP_SHELL = '/';
 
 self.addEventListener('install', (event) => {
@@ -6,7 +6,11 @@ self.addEventListener('install', (event) => {
 });
 
 self.addEventListener('activate', (event) => {
-  event.waitUntil(self.clients.claim());
+  event.waitUntil(
+    caches.keys()
+      .then((keys) => Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k))))
+      .then(() => self.clients.claim())
+  );
 });
 
 self.addEventListener('fetch', (event) => {
@@ -17,15 +21,29 @@ self.addEventListener('fetch', (event) => {
   if (url.origin !== self.location.origin) return;
   if (url.pathname.startsWith('/api/') || url.pathname.startsWith('/auth/')) return;
 
+  // Never cache the navigable HTML shell — it references the current
+  // build's content-hashed JS/CSS filenames, so a stale cached copy keeps
+  // pointing at an old deployment's bundle even after a fresh redeploy.
+  // A flaky connection (one failed fetch) used to be enough to pin that
+  // stale index.html in the cache indefinitely. Hashed static assets
+  // (JS/CSS/images) are still cached below — those are safe since their
+  // filename changes whenever their content does.
+  if (request.mode === 'navigate') {
+    event.respondWith(
+      fetch(request).catch(() => caches.match(APP_SHELL))
+    );
+    return;
+  }
+
   event.respondWith(
     fetch(request)
       .then((response) => {
-        if (response.ok && (request.mode === 'navigate' || response.type === 'basic')) {
+        if (response.ok && response.type === 'basic') {
           const copy = response.clone();
           caches.open(CACHE).then((cache) => cache.put(request, copy)).catch(() => {});
         }
         return response;
       })
-      .catch(() => caches.match(request).then((cached) => cached || caches.match(APP_SHELL)))
+      .catch(() => caches.match(request))
   );
 });
