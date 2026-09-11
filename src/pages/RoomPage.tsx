@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Send, UserPlus, Copy, Check, LogOut, Crown, Mic, MicOff, PhoneOff, ImagePlus, X } from 'lucide-react';
+import { ArrowLeft, Send, UserPlus, Copy, Check, LogOut, Crown, Mic, MicOff, PhoneOff, ImagePlus, X, Settings, Lock, Video, VideoOff } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { useRoomChat, type RoomMessage } from '../hooks/useRoomChat';
@@ -8,6 +8,7 @@ import { useRooms, usePendingRoomRequests } from '../hooks/useRooms';
 import { useRoomVoiceCall } from '../hooks/useRoomVoiceCall';
 import { relativeTime } from '../lib/timeFormat';
 import { linkify } from '../lib/linkify';
+import { extractVideoEmbedUrl } from '../lib/extractIframeSrc';
 import RoomImageMessage from '../components/room/RoomImageMessage';
 
 const QUICK_EMOJIS = ['👍', '❤️', '😂', '🎉', '😮', '🙏'];
@@ -23,7 +24,7 @@ export default function RoomPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { messages, members, loading, sendMessage, sendImageMessage } = useRoomChat(id);
-  const { leaveRoom, inviteByUserId } = useRooms();
+  const { leaveRoom, inviteByUserId, updateRoomSettings } = useRooms();
   const { requests, respond } = usePendingRoomRequests(id);
   const { inVoice, connecting, isMuted, voicePresentIds, remoteStreams, joinVoice, leaveVoice, toggleMute } = useRoomVoiceCall(id);
 
@@ -31,6 +32,8 @@ export default function RoomPage() {
   const [input, setInput] = useState('');
   const [showInvite, setShowInvite] = useState(false);
   const [showMembers, setShowMembers] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  const [showVideo, setShowVideo] = useState(true);
   const [copied, setCopied] = useState(false);
   const [floatingReactions, setFloatingReactions] = useState<FloatingReaction[]>([]);
   const [pendingImage, setPendingImage] = useState<{ file: File; previewUrl: string } | null>(null);
@@ -38,12 +41,17 @@ export default function RoomPage() {
   const seenEmojiIds = useRef<Set<string> | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
+  const refreshRoom = () => {
     if (!id) return;
     supabase.from('rooms').select('*').eq('id', id).single().then(({ data, error }) => {
       if (error) console.error('Failed to load room:', error);
       setRoom(data);
     });
+  };
+
+  useEffect(() => {
+    refreshRoom();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
   // Text messages render in the chat feed; emoji "messages" are reactions —
@@ -83,6 +91,7 @@ export default function RoomPage() {
 
   const isOwner = room && user && room.owner_id === user.id;
   const activeMembers = members.filter(m => m.status === 'active');
+  const canSend = isOwner || !room?.chat_locked;
 
   const handleSend = async () => {
     if (pendingImage) {
@@ -193,6 +202,11 @@ export default function RoomPage() {
           <button onClick={handleLeave} className="p-2 text-white/90 hover:text-white shrink-0" aria-label="Leave room">
             <LogOut size={20} />
           </button>
+          {isOwner && (
+            <button onClick={() => setShowSettings(true)} className="p-2 text-white/90 hover:text-white shrink-0" aria-label="Room settings">
+              <Settings size={20} />
+            </button>
+          )}
         </div>
 
         {inVoice && (
@@ -247,6 +261,35 @@ export default function RoomPage() {
           ))}
         </div>
       </div>
+
+      {room?.video_embed_url && showVideo && (
+        <div className="relative bg-black shrink-0">
+          <div className="aspect-video w-full">
+            <iframe
+              src={room.video_embed_url}
+              className="w-full h-full"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allowFullScreen
+              sandbox="allow-scripts allow-same-origin allow-presentation allow-popups"
+            />
+          </div>
+          <button
+            onClick={() => setShowVideo(false)}
+            className="absolute top-2 right-2 p-1.5 bg-black/60 text-white rounded-full"
+            aria-label="Hide video"
+          >
+            <VideoOff size={16} />
+          </button>
+        </div>
+      )}
+      {room?.video_embed_url && !showVideo && (
+        <button
+          onClick={() => setShowVideo(true)}
+          className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-purple-700 bg-purple-50 border-b border-purple-100 shrink-0"
+        >
+          <Video size={14} /> Video dikhayein
+        </button>
+      )}
 
       {isOwner && requests.length > 0 && (
         <div className="bg-amber-50 border-b border-amber-100 px-4 py-2 space-y-2 shrink-0">
@@ -314,18 +357,25 @@ export default function RoomPage() {
       </div>
 
       {/* Always-visible reaction strip, like a live stream's quick-react bar */}
-      <div className="flex items-center gap-1.5 px-3 pt-2 bg-white border-t border-gray-100 shrink-0">
-        {QUICK_EMOJIS.map(e => (
-          <button
-            key={e}
-            onClick={() => handleEmoji(e)}
-            className="text-xl p-1.5 rounded-full hover:bg-gray-100 active:scale-90 transition-transform"
-          >
-            {e}
-          </button>
-        ))}
-      </div>
+      {canSend && (
+        <div className="flex items-center gap-1.5 px-3 pt-2 bg-white border-t border-gray-100 shrink-0">
+          {QUICK_EMOJIS.map(e => (
+            <button
+              key={e}
+              onClick={() => handleEmoji(e)}
+              className="text-xl p-1.5 rounded-full hover:bg-gray-100 active:scale-90 transition-transform"
+            >
+              {e}
+            </button>
+          ))}
+        </div>
+      )}
 
+      {!canSend ? (
+        <div className="flex items-center justify-center gap-2 p-4 pb-[calc(1rem+env(safe-area-inset-bottom,0px))] bg-white border-t border-gray-100 text-sm text-gray-500 shrink-0">
+          <Lock size={15} /> Sirf owner is room me message bhej sakta hai
+        </div>
+      ) : (
       <div className="p-3 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))] bg-white shrink-0">
         {pendingImage && (
           <div className="flex items-center gap-2 mb-2 p-2 bg-gray-50 border border-gray-200 rounded-xl">
@@ -362,6 +412,7 @@ export default function RoomPage() {
           </button>
         </div>
       </div>
+      )}
 
       {showMembers && (
         <Sheet onClose={() => setShowMembers(false)} title="Members">
@@ -393,6 +444,16 @@ export default function RoomPage() {
 
       {showInvite && id && (
         <InviteSheet roomId={id} onClose={() => setShowInvite(false)} onInvite={inviteByUserId} />
+      )}
+
+      {showSettings && id && room && (
+        <RoomSettingsSheet
+          roomId={id}
+          room={room}
+          onClose={() => setShowSettings(false)}
+          onSave={updateRoomSettings}
+          onSaved={refreshRoom}
+        />
       )}
     </div>
   );
@@ -474,3 +535,115 @@ function InviteSheet({ roomId, onClose, onInvite }: { roomId: string; onClose: (
     </Sheet>
   );
 }
+
+function RoomSettingsSheet({
+  roomId, room, onClose, onSave, onSaved,
+}: {
+  roomId: string;
+  room: any;
+  onClose: () => void;
+  onSave: (roomId: string, settings: { chat_locked?: boolean; video_embed_url?: string | null }) => Promise<void>;
+  onSaved: () => void;
+}) {
+  const [chatLocked, setChatLocked] = useState<boolean>(!!room.chat_locked);
+  const [videoInput, setVideoInput] = useState(room.video_embed_url || '');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleSaveChatLock = async (value: boolean) => {
+    setChatLocked(value);
+    try {
+      await onSave(roomId, { chat_locked: value });
+      onSaved();
+    } catch (err: any) {
+      setChatLocked(!value);
+      setError(err?.message || 'Save nahi ho paya.');
+    }
+  };
+
+  const handleSaveVideo = async () => {
+    setError(null);
+    setBusy(true);
+    try {
+      const url = videoInput.trim() ? extractVideoEmbedUrl(videoInput) : null;
+      if (videoInput.trim() && !url) {
+        setError('Valid URL ya <iframe> code nahi mila. Dobara check karein.');
+        setBusy(false);
+        return;
+      }
+      await onSave(roomId, { video_embed_url: url });
+      onSaved();
+      setVideoInput(url || '');
+    } catch (err: any) {
+      setError(err?.message || 'Save nahi ho paya.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleRemoveVideo = async () => {
+    setBusy(true);
+    try {
+      await onSave(roomId, { video_embed_url: null });
+      onSaved();
+      setVideoInput('');
+    } catch (err: any) {
+      setError(err?.message || 'Remove nahi ho paya.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Sheet title="Room Settings" onClose={onClose}>
+      <div className="space-y-5">
+        <div>
+          <label className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-sm font-medium text-gray-900">Sirf owner message bhej sake</p>
+              <p className="text-xs text-gray-500">On karne par baaki members sirf padh sakenge, message/emoji nahi bhej sakenge</p>
+            </div>
+            <input
+              type="checkbox"
+              checked={chatLocked}
+              onChange={e => handleSaveChatLock(e.target.checked)}
+              className="w-5 h-5 accent-blue-600 shrink-0"
+            />
+          </label>
+        </div>
+
+        <div className="pt-4 border-t border-gray-100">
+          <p className="text-sm font-medium text-gray-900 mb-1">Video (iframe/link)</p>
+          <p className="text-xs text-gray-500 mb-2">YouTube ya kisi aur video ka link, ya poora {'<iframe>'} embed code paste karein</p>
+          <textarea
+            value={videoInput}
+            onChange={e => setVideoInput(e.target.value)}
+            placeholder="https://www.youtube.com/embed/... ya <iframe src=...></iframe>"
+            className="w-full px-3 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm resize-none"
+            rows={3}
+          />
+          {error && <p className="text-sm text-red-600 mt-2">{error}</p>}
+          <div className="flex gap-2 mt-2">
+            <button
+              onClick={handleSaveVideo}
+              disabled={busy}
+              className="flex-1 py-2 bg-blue-600 text-white rounded-xl text-sm font-medium disabled:opacity-50"
+            >
+              {busy ? 'Save ho raha hai...' : 'Video Save Karein'}
+            </button>
+            {room.video_embed_url && (
+              <button
+                onClick={handleRemoveVideo}
+                disabled={busy}
+                className="px-4 py-2 bg-gray-100 text-gray-700 rounded-xl text-sm font-medium disabled:opacity-50"
+              >
+                Hatayein
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    </Sheet>
+  );
+}
+

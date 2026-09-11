@@ -143,6 +143,13 @@ export function useRooms() {
     await fetchRooms();
   }, [user, fetchRooms]);
 
+  // Owner-only room settings (chat lock, video embed). Relies on the
+  // existing "Owner can update own room" RLS policy — no new policy needed.
+  const updateRoomSettings = useCallback(async (roomId: string, settings: { chat_locked?: boolean; video_embed_url?: string | null }) => {
+    const { error } = await supabase.from('rooms').update(settings).eq('id', roomId);
+    if (error) throw error;
+  }, []);
+
   const inviteByUserId = useCallback(async (roomId: string, userId: string) => {
     if (!user) throw new Error('Not signed in');
     const { error } = await supabase
@@ -202,7 +209,7 @@ export function useRooms() {
       : { requested: true, roomId: room.id, roomName: room.name };
   }, [user, fetchRooms, requestToJoin]);
 
-  return { rooms, loading, fetchRooms, createRoom, leaveRoom, inviteByUserId, joinByCode, requestToJoin };
+  return { rooms, loading, fetchRooms, createRoom, leaveRoom, inviteByUserId, joinByCode, requestToJoin, updateRoomSettings };
 }
 
 /** Public rooms for the Explore tab. */
