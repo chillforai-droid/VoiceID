@@ -429,48 +429,4 @@ function InviteSheet({ roomId, onClose, onInvite }: { roomId: string; onClose: (
       setSearching(false);
     }, 300);
     return () => clearTimeout(timeout);
-  }, [query]);
-
-  const handleInvite = async (userId: string) => {
-    try {
-      await onInvite(roomId, userId);
-      setInvited(prev => new Set(prev).add(userId));
-    } catch (err) {
-      console.error('Failed to invite:', err);
-    }
-  };
-
-  return (
-    <Sheet title="Friend Invite Karein" onClose={onClose}>
-      <input
-        value={query}
-        onChange={e => setQuery(e.target.value)}
-        placeholder="Username ya naam search karein"
-        className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 mb-3"
-        autoFocus
-      />
-      {searching && <p className="text-sm text-gray-400">Search ho raha hai...</p>}
-      <div className="space-y-2">
-        {results.map(p => (
-          <div key={p.id} className="flex items-center gap-3">
-            {p.avatar_url ? (
-              <img src={p.avatar_url} className="w-9 h-9 rounded-full object-cover" alt={p.username} />
-            ) : (
-              <div className="w-9 h-9 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-sm font-bold">
-                {(p.display_name || p.username).charAt(0).toUpperCase()}
-              </div>
-            )}
-            <span className="flex-1 text-sm text-gray-900 truncate">{p.display_name || p.username}</span>
-            <button
-              onClick={() => handleInvite(p.id)}
-              disabled={invited.has(p.id)}
-              className="px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-medium disabled:opacity-50"
-            >
-              {invited.has(p.id) ? 'Invited' : 'Invite'}
-            </button>
-          </div>
-        ))}
-      </div>
-    </Sheet>
-  );
-}
+                      }
