@@ -1,0 +1,7 @@
+{
+  "type": "task-failed",
+  "createdAt": "2026-08-21T09:07:52.005Z",
+  "taskId": "task-1787303196312-4d8acc",
+  "title": "Repository के available tests, typecheck, lint या build commands पहचानो और relevant checks चलाकर failures को safely fix करो।",
+  "error": "Command failed: ./node_modules/.bin/openclaw agent exec --message-file /tmp/openclaw-task.txt --cwd /tmp/voiceid-work --model google/gemini-3.1-flash-lite --json\nOpenClaw does not recognize option \"--cwd\".\nTry: openclaw agent exec --help\n"
+}
