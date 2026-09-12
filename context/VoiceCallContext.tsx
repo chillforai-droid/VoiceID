@@ -22,6 +22,8 @@ interface VoiceCallContextType {
   isCameraOff: boolean;
   toggleCamera: () => void;
   switchCamera: () => Promise<void>;
+  callMessages: { id: string; from: 'me' | 'peer'; text: string; at: number }[];
+  sendCallMessage: (text: string) => void;
 }
 
 const VoiceCallContext = createContext<VoiceCallContextType>({} as VoiceCallContextType);
@@ -67,6 +69,34 @@ export const VoiceCallProvider = ({ children }: { children: React.ReactNode }) =
   const [callType, setCallType] = useState<CallType>('voice');
   const callTypeRef = useRef<CallType>('voice');
   const facingModeRef = useRef<'user' | 'environment'>('user');
+  const dataChannelRef = useRef<RTCDataChannel | null>(null);
+  const [callMessages, setCallMessages] = useState<{ id: string; from: 'me' | 'peer'; text: string; at: number }[]>([]);
+
+  const setupDataChannel = useCallback((dc: RTCDataChannel) => {
+    dataChannelRef.current = dc;
+    dc.onmessage = event => {
+      try {
+        const parsed = JSON.parse(event.data);
+        if (parsed?.text) {
+          setCallMessages(prev => [...prev, { id: crypto.randomUUID(), from: 'peer', text: String(parsed.text).slice(0, 2000), at: Date.now() }]);
+        }
+      } catch { /* ignore malformed payload */ }
+    };
+    dc.onclose = () => { if (dataChannelRef.current === dc) dataChannelRef.current = null; };
+  }, []);
+
+  // In-call quick chat, sent peer-to-peer over the same RTCPeerConnection
+  // as the call media — it's not written to the messages table, so it
+  // stays scoped to this call (closer to WhatsApp's in-call chat than a
+  // regular message thread) and needs no conversation lookup, since a
+  // `calls` row only has caller_id/receiver_id, not a conversation_id.
+  const sendCallMessage = useCallback((text: string) => {
+    const trimmed = text.trim();
+    const dc = dataChannelRef.current;
+    if (!trimmed || !dc || dc.readyState !== 'open') return;
+    dc.send(JSON.stringify({ text: trimmed }));
+    setCallMessages(prev => [...prev, { id: crypto.randomUUID(), from: 'me', text: trimmed, at: Date.now() }]);
+  }, []);
 
   const setState = useCallback((state: string) => {
     callStateRef.current = state;
@@ -160,6 +190,8 @@ export const VoiceCallProvider = ({ children }: { children: React.ReactNode }) =
     callTypeRef.current = 'voice';
     setCallType('voice');
     facingModeRef.current = 'user';
+    dataChannelRef.current = null;
+    setCallMessages([]);
     setState('idle');
   }, [clearCallTimer, setState]);
 
@@ -258,6 +290,10 @@ export const VoiceCallProvider = ({ children }: { children: React.ReactNode }) =
       attachRemoteStream(stream);
     };
 
+    // Callee side: the caller creates the data channel (see initiateCall's
+    // offer flow), which arrives here. Caller side never fires this.
+    pc.ondatachannel = event => setupDataChannel(event.channel);
+
     pc.onconnectionstatechange = () => {
       const state = pc.connectionState;
       if (state === 'connected') setState('connected');
@@ -270,7 +306,7 @@ export const VoiceCallProvider = ({ children }: { children: React.ReactNode }) =
         void failCall('कॉल के लिए नेटवर्क कनेक्शन नहीं बन पाया।');
       }
     };
-  }, [attachRemoteStream, cleanupCall, failCall, setState]);
+  }, [attachRemoteStream, cleanupCall, failCall, setState, setupDataChannel]);
 
   const createLocalPeer = useCallback(async (channel: RealtimeChannel) => {
     const pc = new RTCPeerConnection(buildIceServers());
@@ -385,6 +421,7 @@ export const VoiceCallProvider = ({ children }: { children: React.ReactNode }) =
       setState('connecting');
       try {
         const pc = await createLocalPeer(channel);
+        setupDataChannel(pc.createDataChannel('chat'));
         const offer = await pc.createOffer();
         await pc.setLocalDescription(offer);
         await channel.send({ type: 'broadcast', event: 'offer', payload: offer });
@@ -408,7 +445,7 @@ export const VoiceCallProvider = ({ children }: { children: React.ReactNode }) =
 
     channel.on('broadcast', { event: 'ice-candidate' }, ({ payload }) => { void addRemoteIce(payload); });
     void channel.subscribe();
-  }, [user, canCallUser, subscribeCallUpdates, cleanupCall, clearCallTimer, setState, createLocalPeer, flushIce, addRemoteIce, failCall]);
+  }, [user, canCallUser, subscribeCallUpdates, cleanupCall, clearCallTimer, setState, createLocalPeer, flushIce, addRemoteIce, failCall, setupDataChannel]);
 
   const acceptCall = useCallback(async () => {
     const call = activeCallRef.current;
@@ -531,8 +568,8 @@ export const VoiceCallProvider = ({ children }: { children: React.ReactNode }) =
   const value = useMemo(() => ({
     callState, activeCall, callType, initiateCall, acceptCall, endCall, cleanupCall,
     remoteAudioRef, localVideoRef, remoteVideoRef, canCallUser, isMuted, toggleMute,
-    isCameraOff, toggleCamera, switchCamera,
-  }), [callState, activeCall, callType, initiateCall, acceptCall, endCall, cleanupCall, canCallUser, isMuted, toggleMute, isCameraOff, toggleCamera, switchCamera]);
+    isCameraOff, toggleCamera, switchCamera, callMessages, sendCallMessage,
+  }), [callState, activeCall, callType, initiateCall, acceptCall, endCall, cleanupCall, canCallUser, isMuted, toggleMute, isCameraOff, toggleCamera, switchCamera, callMessages, sendCallMessage]);
 
   return <VoiceCallContext.Provider value={value}>{children}</VoiceCallContext.Provider>;
 };
