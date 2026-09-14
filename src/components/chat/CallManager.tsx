@@ -168,6 +168,12 @@ export const CallManager = () => {
   const name = otherProfile?.display_name || otherProfile?.username || 'VoiceID User';
   const isIncoming = callState === 'ringing-incoming';
   const isOutgoing = callState === 'ringing-outgoing';
+  // Mute/speaker/camera toggle the local stream directly, which already
+  // exists as soon as you place an outgoing call — no need to wait for
+  // the peer to actually pick up, same as WhatsApp lets you set these
+  // while it's still ringing. In-call chat is the one exception: it rides
+  // the WebRTC data channel, which only exists once the call connects.
+  const canUseLocalControls = isActive || isOutgoing;
   const showRemoteVideo = isVideo && (callState === 'connected' || callState === 'connecting');
   const showOverlay = !isConnectedVideoCall || controlsVisible;
 
@@ -288,12 +294,12 @@ export const CallManager = () => {
       {(isOutgoing || isActive) && (
         <div
           onClick={e => e.stopPropagation()}
-          className={`relative z-10 backdrop-blur-sm rounded-t-3xl px-6 pt-6 pb-8 transition-opacity duration-300 ${surface === 'dark' ? 'bg-white/5' : 'bg-gray-50'} ${showOverlay ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
+          className={`relative z-10 backdrop-blur-sm rounded-t-3xl px-6 pt-6 pb-8 transition-opacity duration-300 ${surface === 'dark' ? 'bg-white/10' : 'bg-gray-100'} ${showOverlay ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
         >
           {audioRouteError && <p className={`text-xs text-center mb-3 ${surface === 'dark' ? 'text-red-300' : 'text-red-600'}`}>{audioRouteError}</p>}
 
           <div className="grid grid-cols-3 gap-y-6 justify-items-center">
-            {isActive && canToggleSpeaker && (
+            {canUseLocalControls && canToggleSpeaker && (
               <CallControl
                 icon={isSpeakerOn ? <Volume2 size={24} /> : <Volume1 size={24} />}
                 label="Speaker"
@@ -302,7 +308,7 @@ export const CallManager = () => {
                 onClick={toggleSpeaker}
               />
             )}
-            {isVideo && isActive ? (
+            {isVideo && canUseLocalControls ? (
               <CallControl
                 icon={isCameraOff ? <VideoOff size={24} /> : <Video size={24} />}
                 label="Video"
@@ -311,7 +317,7 @@ export const CallManager = () => {
                 onClick={toggleCamera}
               />
             ) : <span />}
-            {isActive && (
+            {canUseLocalControls && (
               <CallControl
                 icon={isMuted ? <MicOff size={24} /> : <Mic size={24} />}
                 label="Mute"
@@ -321,7 +327,7 @@ export const CallManager = () => {
               />
             )}
 
-            {isVideo && isActive && !isCameraOff ? (
+            {isVideo && canUseLocalControls && !isCameraOff ? (
               <CallControl icon={<SwitchCamera size={24} />} label="Flip" surface={surface} onClick={switchCamera} />
             ) : <span />}
             {isActive && (
