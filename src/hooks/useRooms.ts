@@ -11,9 +11,50 @@ export interface RoomSummary {
   is_active: boolean;
   is_public: boolean;
   category: string | null;
+  room_type: 'normal' | 'creator';
+  avatar_url: string | null;
+  cover_url: string | null;
+  is_featured: boolean;
   created_at: string;
-  my_role: 'owner' | 'member';
+  my_role: 'owner' | 'moderator' | 'member';
   member_count: number;
+}
+
+export interface CreatorRoom {
+  id: string;
+  name: string;
+  description: string | null;
+  category: string | null;
+  avatar_url: string | null;
+  cover_url: string | null;
+  creator_display_name: string | null;
+  owner_name: string;
+  member_count: number;
+  is_featured: boolean;
+  my_status: string | null;
+  created_at: string;
+}
+
+export interface RoomMemberForManagement {
+  member_row_id: string;
+  user_id: string;
+  username: string;
+  display_name: string | null;
+  avatar_url: string | null;
+  role: 'owner' | 'moderator' | 'member';
+  status: string;
+  is_muted: boolean;
+  is_banned: boolean;
+  joined_at: string;
+}
+
+export interface RoomStats {
+  total_members: number;
+  new_members_7d: number;
+  total_messages: number;
+  messages_7d: number;
+  room_views: number;
+  active_members_7d: number;
 }
 
 export interface PublicRoom {
@@ -28,6 +69,9 @@ export interface PublicRoom {
 }
 
 export const ROOM_CATEGORIES = ['General', 'Music', 'Gaming', 'Study', 'Just Chatting'] as const;
+export const CREATOR_ROOM_CATEGORIES = [
+  'Technology', 'Gaming', 'Education', 'Entertainment', 'Music', 'News', 'Business', 'Motivation', 'General', 'Other',
+] as const;
 
 export interface PendingRequest {
   id: string; // room_members.id
@@ -76,7 +120,7 @@ export function useRooms() {
     }
 
     const roomIds = memberships.map(m => m.room_id);
-    const roleByRoom = new Map(memberships.map(m => [m.room_id, m.role as 'owner' | 'member']));
+    const roleByRoom = new Map(memberships.map(m => [m.room_id, m.role as 'owner' | 'moderator' | 'member']));
 
     const [{ data: roomRows, error: roomError }, { data: counts, error: countError }] = await Promise.all([
       supabase.from('rooms').select('*').in('id', roomIds),
@@ -105,7 +149,13 @@ export function useRooms() {
 
   useEffect(() => { fetchRooms(); }, [fetchRooms]);
 
-  const createRoom = useCallback(async (name: string, description?: string, isPublic = false, category?: string) => {
+  const createRoom = useCallback(async (
+    name: string,
+    description?: string,
+    isPublic = false,
+    category?: string,
+    creatorOptions?: { roomType?: 'normal' | 'creator'; avatarUrl?: string | null; coverUrl?: string | null; rules?: string; creatorDisplayName?: string },
+  ) => {
     if (!user) throw new Error('Not signed in');
     let lastError: any = null;
     // room_code is unique; retry a couple of times on the rare collision.
@@ -118,7 +168,12 @@ export function useRooms() {
           description: description?.trim() || null,
           room_code: generateRoomCode(),
           is_public: isPublic,
-          category: isPublic ? (category || 'General') : null,
+          category: category || (isPublic ? 'General' : null),
+          room_type: creatorOptions?.roomType || 'normal',
+          avatar_url: creatorOptions?.avatarUrl || null,
+          cover_url: creatorOptions?.coverUrl || null,
+          rules: creatorOptions?.rules?.trim() || null,
+          creator_display_name: creatorOptions?.creatorDisplayName?.trim() || null,
         })
         .select()
         .single();
@@ -143,9 +198,16 @@ export function useRooms() {
     await fetchRooms();
   }, [user, fetchRooms]);
 
-  // Owner-only room settings (chat lock, video embed). Relies on the
-  // existing "Owner can update own room" RLS policy — no new policy needed.
-  const updateRoomSettings = useCallback(async (roomId: string, settings: { chat_locked?: boolean; video_embed_url?: string | null }) => {
+  // Owner-only room settings — chat lock, video embed, and (new) the full
+  // creator-room profile fields. Relies on the existing "Owner can update
+  // own room" RLS policy — no new policy needed, since this is one
+  // generic partial update against the same table/policy as before.
+  const updateRoomSettings = useCallback(async (roomId: string, settings: {
+    chat_locked?: boolean; video_embed_url?: string | null;
+    name?: string; description?: string | null; category?: string | null;
+    is_public?: boolean; rules?: string | null; creator_display_name?: string | null;
+    avatar_url?: string | null; cover_url?: string | null;
+  }) => {
     const { error } = await supabase.from('rooms').update(settings).eq('id', roomId);
     if (error) throw error;
   }, []);
@@ -189,6 +251,7 @@ export function useRooms() {
     if (error) throw error;
     const room = data?.[0];
     if (!room) throw new Error('Room code not found');
+    if (room.is_banned) return { banned: true, roomId: room.id, roomName: room.name };
     if (room.my_status === 'active') return { alreadyMember: true, roomId: room.id };
     if (room.my_status === 'pending') return { alreadyRequested: true, roomId: room.id };
 
@@ -309,4 +372,102 @@ export function usePendingRoomRequests(roomId?: string) {
   }, []);
 
   return { requests, loading, fetchRequests, respond };
+}
+
+/** Creator Rooms discovery (search + category), separate from the plain public-room Explore tab. */
+export function useCreatorRooms(category?: string, search?: string) {
+  const [rooms, setRooms] = useState<CreatorRoom[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const fetchCreatorRooms = useCallback(async () => {
+    setLoading(true);
+    const { data, error } = await supabase.rpc('list_creator_rooms', {
+      p_category: category || null,
+      p_search: search?.trim() || null,
+    });
+    if (error) {
+      console.error('Failed to load creator rooms:', error);
+      setRooms([]);
+      setLoading(false);
+      return;
+    }
+    setRooms(data ?? []);
+    setLoading(false);
+  }, [category, search]);
+
+  useEffect(() => { fetchCreatorRooms(); }, [fetchCreatorRooms]);
+
+  return { rooms, loading, fetchCreatorRooms };
+}
+
+/**
+ * Owner/moderator room management: member roster + moderation actions +
+ * stats. Every write here is still re-checked server-side (RLS +
+ * enforce_room_moderation_permissions trigger) — this hook is a
+ * convenience wrapper, not the actual security boundary.
+ */
+export function useRoomModeration(roomId: string | undefined) {
+  const [members, setMembers] = useState<RoomMemberForManagement[]>([]);
+  const [stats, setStats] = useState<RoomStats | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  const fetchMembers = useCallback(async () => {
+    if (!roomId) { setMembers([]); setLoading(false); return; }
+    setLoading(true);
+    const { data, error } = await supabase.rpc('list_room_members_for_management', { p_room_id: roomId });
+    if (error) {
+      console.error('Failed to load room roster for management:', error);
+      setMembers([]);
+      setLoading(false);
+      return;
+    }
+    setMembers(data ?? []);
+    setLoading(false);
+  }, [roomId]);
+
+  const fetchStats = useCallback(async () => {
+    if (!roomId) { setStats(null); return; }
+    const { data, error } = await supabase.rpc('get_room_stats', { p_room_id: roomId });
+    if (error) { console.error('Failed to load room stats:', error); return; }
+    setStats(data?.[0] ?? null);
+  }, [roomId]);
+
+  useEffect(() => { fetchMembers(); fetchStats(); }, [fetchMembers, fetchStats]);
+
+  const setMuted = useCallback(async (memberRowId: string, muted: boolean) => {
+    const { error } = await supabase.from('room_members').update({ is_muted: muted }).eq('id', memberRowId);
+    if (error) throw error;
+    await fetchMembers();
+  }, [fetchMembers]);
+
+  const removeMember = useCallback(async (memberRowId: string) => {
+    const { error } = await supabase.from('room_members').update({ status: 'left' }).eq('id', memberRowId);
+    if (error) throw error;
+    await fetchMembers();
+  }, [fetchMembers]);
+
+  const banMember = useCallback(async (memberRowId: string) => {
+    const { error } = await supabase.from('room_members').update({ status: 'left', is_banned: true }).eq('id', memberRowId);
+    if (error) throw error;
+    await fetchMembers();
+  }, [fetchMembers]);
+
+  const setModerator = useCallback(async (memberRowId: string, isModerator: boolean) => {
+    const { error } = await supabase.from('room_members').update({ role: isModerator ? 'moderator' : 'member' }).eq('id', memberRowId);
+    if (error) throw error;
+    await fetchMembers();
+  }, [fetchMembers]);
+
+  const deleteMessage = useCallback(async (messageId: string) => {
+    const { error } = await supabase.from('room_messages').delete().eq('id', messageId);
+    if (error) throw error;
+  }, []);
+
+  return { members, stats, loading, fetchMembers, fetchStats, setMuted, removeMember, banMember, setModerator, deleteMessage };
+}
+
+/** Fire-and-forget room analytics event (view/join/leave are logged this way; message_sent is auto-logged server-side). */
+export async function logRoomEvent(roomId: string, userId: string | null, eventType: 'room_view' | 'room_join' | 'room_leave') {
+  const { error } = await supabase.from('room_events').insert({ room_id: roomId, user_id: userId, event_type: eventType });
+  if (error) console.error('Failed to log room event:', error);
 }

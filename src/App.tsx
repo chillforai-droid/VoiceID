@@ -33,6 +33,8 @@ const HelpPage = lazy(() => import('./pages/landing/HelpPage'));
 const PrivacyLanding = lazy(() => import('./pages/landing/PrivacyLanding'));
 const SecurityPage = lazy(() => import('./pages/landing/SecurityPage'));
 const AboutPage = lazy(() => import('./pages/landing/AboutPage'));
+const StorePage = lazy(() => import('./pages/StorePage'));
+const ProductDetailPage = lazy(() => import('./pages/ProductDetailPage'));
 
 // Auth flow
 const Welcome = lazy(() => import('./components/auth/Welcome'));
@@ -55,6 +57,7 @@ const ConversationsPage = lazy(() => import('./pages/ConversationsPage'));
 const ChatPage = lazy(() => import('./pages/ChatPage'));
 const RoomsPage = lazy(() => import('./pages/RoomsPage'));
 const RoomPage = lazy(() => import('./pages/RoomPage'));
+const RoomManagePage = lazy(() => import('./pages/RoomManagePage'));
 const CallHistoryPage = lazy(() => import('./pages/CallHistoryPage'));
 const SettingsPage = lazy(() => import('./pages/SettingsPage'));
 
@@ -87,6 +90,8 @@ export default function App() {
                   <Route path="/privacy" element={<PrivacyLanding />} />
                   <Route path="/security" element={<SecurityPage />} />
                   <Route path="/about" element={<AboutPage />} />
+                  <Route path="/store" element={<StorePage />} />
+                  <Route path="/store/:slug" element={<ProductDetailPage />} />
                   <Route path="/auth/welcome" element={<Welcome />} />
                   <Route path="/auth/signup" element={<SignUp />} />
                   <Route path="/auth/login" element={<Login />} />
@@ -106,6 +111,7 @@ export default function App() {
                     <Route path="chat/:id" element={<ChatPage />} />
                     <Route path="rooms" element={<RoomsPage />} />
                     <Route path="rooms/:id" element={<RoomPage />} />
+                    <Route path="rooms/:id/manage" element={<RoomManagePage />} />
                     <Route path="calls" element={<CallHistoryPage />} />
                     <Route path="notifications" element={<NotificationsPage />} />
                     <Route path="settings" element={<SettingsPage />} />

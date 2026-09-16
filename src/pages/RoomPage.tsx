@@ -1,16 +1,17 @@
 import { useEffect, useRef, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Send, UserPlus, Copy, Check, LogOut, Crown, Mic, MicOff, PhoneOff, ImagePlus, X, Settings, Lock, Video, VideoOff, Share2 } from 'lucide-react';
+import { useParams, useNavigate, Link } from 'react-router-dom';
+import { ArrowLeft, Send, UserPlus, Copy, Check, LogOut, Crown, Mic, MicOff, PhoneOff, ImagePlus, X, Settings, Lock, Video, VideoOff, Share2, Shield } from 'lucide-react';
 import { getRoomImageUrl } from '../lib/roomMediaDownload';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { useRoomChat, type RoomMessage } from '../hooks/useRoomChat';
-import { useRooms, usePendingRoomRequests } from '../hooks/useRooms';
+import { useRooms, usePendingRoomRequests, logRoomEvent } from '../hooks/useRooms';
 import { useRoomVoiceCall } from '../hooks/useRoomVoiceCall';
 import { relativeTime } from '../lib/timeFormat';
 import { linkify } from '../lib/linkify';
 import { extractVideoEmbedUrl } from '../lib/extractIframeSrc';
 import RoomImageMessage from '../components/room/RoomImageMessage';
+import CreatorBadge from '../components/room/CreatorBadge';
 
 const QUICK_EMOJIS = ['👍', '❤️', '😂', '🎉', '😮', '🙏'];
 
@@ -52,6 +53,7 @@ export default function RoomPage() {
 
   useEffect(() => {
     refreshRoom();
+    if (id) logRoomEvent(id, user?.id ?? null, 'room_view');
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
@@ -224,8 +226,9 @@ export default function RoomPage() {
               <span className="w-2 h-2 rounded-full bg-red-400 animate-pulse shrink-0" />
               <h1 className="font-semibold text-white truncate">{room?.name || 'Room'}</h1>
               {isOwner && <Crown size={14} className="text-amber-300 shrink-0" />}
+              {room?.room_type === 'creator' && <CreatorBadge />}
             </div>
-            <p className="text-xs text-white/70">{activeMembers.length} in room</p>
+            <p className="text-xs text-white/70">{activeMembers.length} in room{room?.creator_display_name ? ` · ${room.creator_display_name}` : ''}</p>
           </div>
           <button onClick={() => setShowInvite(true)} className="p-2 text-white/90 hover:text-white shrink-0" aria-label="Invite">
             <UserPlus size={20} />
@@ -652,6 +655,14 @@ function RoomSettingsSheet({
   return (
     <Sheet title="Room Settings" onClose={onClose}>
       <div className="space-y-5">
+        <Link
+          to={`/dashboard/rooms/${roomId}/manage`}
+          className="flex items-center justify-between px-3 py-2.5 bg-blue-50 text-blue-700 rounded-xl text-sm font-medium"
+        >
+          <span className="flex items-center gap-2"><Shield size={16} /> Manage Room (Profile, Members, Stats)</span>
+          <ArrowLeft size={14} className="rotate-180" />
+        </Link>
+
         <div>
           <label className="flex items-center justify-between gap-3">
             <div>
