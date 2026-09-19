@@ -12,53 +12,62 @@ interface AppShellProps {
 
 export default function AppShell({ children }: AppShellProps) {
   const location = useLocation();
-  // Both 1:1 chat and an open room own the full screen with their own
-  // header/input bar (mirrors a live chat app) — the shared top header and
-  // bottom nav would otherwise double up with the page's own controls and
-  // break the layout on mobile.
-  const isImmersiveRoute = location.pathname.startsWith('/dashboard/chat/')
-    || /^\/dashboard\/rooms\/[^/]+$/.test(location.pathname);
+
+  const isHomeRoute = location.pathname === '/dashboard' || location.pathname === '/dashboard/';
+  const isImmersiveRoute =
+    location.pathname.startsWith('/dashboard/chat/') ||
+    /^\/dashboard\/rooms\/[^/]+$/.test(location.pathname);
 
   return (
-    <div className="flex h-[100dvh] bg-gray-50">
+    <div className="flex h-[100dvh] bg-[#f7f8fc]">
       <CallManager />
-      {/* Desktop Sidebar */}
+
       {!isImmersiveRoute && (
         <div className="hidden md:flex">
           <DesktopSidebar />
         </div>
       )}
-      
-      {/* Main Content */}
-      <div className="flex-1 flex flex-col h-full min-w-0 overflow-hidden">
-        {/* Top Header (Contextual) */}
-        {!isImmersiveRoute && (
-          <header className="pt-safe h-16 border-b border-gray-200 bg-white flex items-center px-4 justify-between md:hidden shrink-0">
+
+      <div className="flex min-w-0 flex-1 flex-col h-full overflow-hidden">
+        {/* HomePage owns its premium mobile header. Other pages keep the original header. */}
+        {!isImmersiveRoute && !isHomeRoute && (
+          <header className="pt-safe h-16 shrink-0 border-b border-gray-200 bg-white flex items-center px-4 justify-between md:hidden">
             <h1 className="font-semibold text-lg text-gray-900">VoiceID</h1>
+
             <div className="flex items-center gap-1">
               <NotificationBell />
+
               <Link
                 to="/dashboard/settings"
                 aria-label="Settings"
-                className={`p-2 rounded-full hover:bg-gray-100 ${location.pathname === '/dashboard/settings' ? 'text-blue-600' : 'text-gray-600'}`}
+                className={`p-2 rounded-full hover:bg-gray-100 ${
+                  location.pathname === '/dashboard/settings'
+                    ? 'text-blue-600'
+                    : 'text-gray-600'
+                }`}
               >
                 <Settings size={22} />
               </Link>
             </div>
           </header>
         )}
-        
-        <main className={`flex-1 overflow-y-auto overflow-x-hidden ${isImmersiveRoute ? '' : 'pb-[calc(5rem+env(safe-area-inset-bottom,0px))] md:pb-0'}`}>
+
+        <main
+          className={`flex-1 overflow-y-auto overflow-x-hidden ${
+            isImmersiveRoute
+              ? ''
+              : 'pb-[calc(5rem+env(safe-area-inset-bottom,0px))] md:pb-0'
+          }`}
+        >
           {children}
         </main>
       </div>
-      
-      {/* Mobile Bottom Nav */}
+
       {!isImmersiveRoute && (
-        <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 pb-safe bg-white">
+        <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 pb-safe bg-white/95 backdrop-blur-xl">
           <MobileBottomNav />
         </div>
       )}
     </div>
   );
-      }
+}
