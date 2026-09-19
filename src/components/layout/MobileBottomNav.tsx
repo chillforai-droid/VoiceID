@@ -1,42 +1,63 @@
 import { memo } from 'react';
-import { Home, Search, MessageSquare, Bell, User } from 'lucide-react';
+import { Compass, Home, MessageCircle, Mic, User } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useNotifications } from '../../context/NotificationContext';
 
 function MobileBottomNav() {
   const { user } = useAuth();
-  const { unreadCount, unreadMessageCount } = useNotifications();
+  const { unreadMessageCount, unreadCount } = useNotifications();
 
-  const navItems = [
+  const items = [
     { name: 'Home', path: '/dashboard', icon: Home, badge: 0 },
-    { name: 'Search', path: '/dashboard/search', icon: Search, badge: 0 },
-    { name: 'Messages', path: '/dashboard/messages', icon: MessageSquare, badge: unreadMessageCount },
-    { name: 'Notifications', path: '/dashboard/notifications', icon: Bell, badge: unreadCount },
+    { name: 'Explore', path: '/dashboard/search', icon: Compass, badge: 0 },
+    { name: 'Voice', path: '/dashboard/rooms', icon: Mic, center: true, badge: 0 },
+    { name: 'Activity', path: '/dashboard/messages', icon: MessageCircle, badge: unreadMessageCount + unreadCount },
     { name: 'Profile', path: user ? `/dashboard/profile/${user.id}` : '/dashboard/profile/me', icon: User, badge: 0 },
   ];
 
   return (
-    <nav className="bg-white border-t border-gray-200 flex justify-around items-stretch h-16 px-1">
-      {navItems.map((item) => (
-        <NavLink
-          key={item.name}
-          to={item.path}
-          className={({ isActive }) =>
-            `relative flex flex-1 flex-col items-center justify-center min-w-0 gap-0.5 text-[11px] font-medium ${
-              isActive ? 'text-blue-600' : 'text-gray-500'
-            }`
-          }
-        >
-          {item.badge > 0 && (
-            <span className="absolute top-1 right-1/2 translate-x-3 bg-red-500 text-white text-[10px] min-w-[18px] h-[18px] px-1 flex items-center justify-center rounded-full">
-              {item.badge > 99 ? '99+' : item.badge}
-            </span>
-          )}
-          <item.icon className="w-6 h-6" />
-          <span className="truncate max-w-full">{item.name}</span>
-        </NavLink>
-      ))}
+    <nav className="mx-auto flex h-[74px] max-w-3xl items-center justify-around border-t border-slate-200/80 bg-white/95 px-2 shadow-[0_-12px_35px_rgba(15,23,42,0.08)] backdrop-blur-xl">
+      {items.map((item) => {
+        const Icon = item.icon;
+        return (
+          <NavLink
+            key={item.name}
+            to={item.path}
+            className={({ isActive }) =>
+              `relative flex min-w-0 flex-1 flex-col items-center justify-center gap-1 text-[10px] font-semibold transition ${
+                item.center
+                  ? 'text-slate-700'
+                  : isActive
+                    ? 'text-indigo-700'
+                    : 'text-slate-500'
+              }`
+            }
+          >
+            {({ isActive }) => (
+              <>
+                {item.center ? (
+                  <span className="-mt-8 flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br from-blue-600 to-violet-600 text-white shadow-[0_10px_25px_rgba(79,70,229,0.35)] ring-8 ring-[#f7f8ff] transition-transform active:scale-95">
+                    <Mic size={28} strokeWidth={2.2} />
+                  </span>
+                ) : (
+                  <span className={`flex h-9 w-12 items-center justify-center rounded-full transition ${isActive ? 'bg-indigo-50' : ''}`}>
+                    <Icon size={24} strokeWidth={isActive ? 2.5 : 2} />
+                  </span>
+                )}
+
+                <span className={item.center ? 'mt-0.5' : ''}>{item.name}</span>
+
+                {item.badge > 0 && (
+                  <span className="absolute right-1/2 top-1 translate-x-6 rounded-full bg-red-500 px-1.5 py-0.5 text-[9px] font-bold text-white ring-2 ring-white">
+                    {item.badge > 99 ? '99+' : item.badge}
+                  </span>
+                )}
+              </>
+            )}
+          </NavLink>
+        );
+      })}
     </nav>
   );
 }

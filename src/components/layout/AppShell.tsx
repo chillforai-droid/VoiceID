@@ -1,6 +1,6 @@
 import React from 'react';
-import { useLocation, Link } from 'react-router-dom';
-import { Settings } from 'lucide-react';
+import { Link, useLocation } from 'react-router-dom';
+import { Bell, Search, Settings, Mic2 } from 'lucide-react';
 import MobileBottomNav from './MobileBottomNav';
 import DesktopSidebar from './DesktopSidebar';
 import { CallManager } from '../chat/CallManager';
@@ -12,53 +12,67 @@ interface AppShellProps {
 
 export default function AppShell({ children }: AppShellProps) {
   const location = useLocation();
-  // Both 1:1 chat and an open room own the full screen with their own
-  // header/input bar (mirrors a live chat app) — the shared top header and
-  // bottom nav would otherwise double up with the page's own controls and
-  // break the layout on mobile.
-  const isImmersiveRoute = location.pathname.startsWith('/dashboard/chat/')
-    || /^\/dashboard\/rooms\/[^/]+$/.test(location.pathname);
+
+  const isImmersiveRoute =
+    location.pathname.startsWith('/dashboard/chat/') ||
+    /^\/dashboard\/rooms\/[^/]+$/.test(location.pathname);
 
   return (
-    <div className="flex h-[100dvh] bg-gray-50">
+    <div className="flex h-[100dvh] bg-[#f7f8ff] text-slate-950">
       <CallManager />
-      {/* Desktop Sidebar */}
+
       {!isImmersiveRoute && (
         <div className="hidden md:flex">
           <DesktopSidebar />
         </div>
       )}
-      
-      {/* Main Content */}
-      <div className="flex-1 flex flex-col h-full min-w-0 overflow-hidden">
-        {/* Top Header (Contextual) */}
+
+      <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         {!isImmersiveRoute && (
-          <header className="pt-safe h-16 border-b border-gray-200 bg-white flex items-center px-4 justify-between md:hidden shrink-0">
-            <h1 className="font-semibold text-lg text-gray-900">VoiceID</h1>
-            <div className="flex items-center gap-1">
-              <NotificationBell />
-              <Link
-                to="/dashboard/settings"
-                aria-label="Settings"
-                className={`p-2 rounded-full hover:bg-gray-100 ${location.pathname === '/dashboard/settings' ? 'text-blue-600' : 'text-gray-600'}`}
-              >
-                <Settings size={22} />
+          <header className="pt-safe z-40 shrink-0 border-b border-slate-200/80 bg-white/95 backdrop-blur-xl md:hidden">
+            <div className="flex h-16 items-center justify-between px-4">
+              <Link to="/dashboard" className="flex items-center gap-2">
+                <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-600 to-violet-600 text-white shadow-md">
+                  <Mic2 size={21} strokeWidth={2.3} />
+                </span>
+                <span className="text-[21px] font-extrabold tracking-tight text-slate-950">
+                  Voice<span className="text-indigo-600">ID</span>
+                </span>
               </Link>
+
+              <div className="flex items-center gap-1">
+                <Link
+                  to="/dashboard/search"
+                  aria-label="Search VoiceID"
+                  className="flex h-10 w-10 items-center justify-center rounded-full text-slate-600 transition hover:bg-slate-100"
+                >
+                  <Search size={22} />
+                </Link>
+                <span className="flex h-10 w-10 items-center justify-center rounded-full text-slate-600">
+                  <NotificationBell />
+                </span>
+                <Link
+                  to="/dashboard/settings"
+                  aria-label="Settings"
+                  className={`flex h-10 w-10 items-center justify-center rounded-full transition hover:bg-slate-100 ${location.pathname === '/dashboard/settings' ? 'text-indigo-600' : 'text-slate-600'}`}
+                >
+                  <Settings size={22} />
+                </Link>
+              </div>
             </div>
           </header>
         )}
-        
-        <main className={`flex-1 overflow-y-auto overflow-x-hidden ${isImmersiveRoute ? '' : 'pb-[calc(5rem+env(safe-area-inset-bottom,0px))] md:pb-0'}`}>
+
+        <main className={`min-h-0 flex-1 overflow-x-hidden overflow-y-auto ${isImmersiveRoute ? '' : 'pb-[calc(5.5rem+env(safe-area-inset-bottom,0px))] md:pb-0'}`}>
           {children}
         </main>
       </div>
-      
-      {/* Mobile Bottom Nav */}
+
       {!isImmersiveRoute && (
-        <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 pb-safe bg-white">
+        <div className="pb-safe fixed bottom-0 left-0 right-0 z-50 md:hidden">
           <MobileBottomNav />
         </div>
       )}
     </div>
   );
-      }
+}
