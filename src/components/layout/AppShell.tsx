@@ -30,10 +30,10 @@ export default function AppShell({ children }: AppShellProps) {
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         {!isImmersiveRoute && (
           <header className="pt-safe z-40 shrink-0 border-b border-slate-200/80 bg-white/95 backdrop-blur-xl md:hidden">
-            <div className="flex h-16 items-center justify-between px-4">
+            <div className="flex h-[76px] items-center justify-between px-4">
               <Link to="/dashboard" className="flex items-center gap-2">
-                <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-600 to-violet-600 text-white shadow-md">
-                  <Mic2 size={21} strokeWidth={2.3} />
+                <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-600 via-indigo-600 to-violet-600 text-white shadow-lg shadow-indigo-500/20">
+                  <Mic2 size={22} strokeWidth={2.5} />
                 </span>
                 <span className="text-[21px] font-extrabold tracking-tight text-slate-950">
                   Voice<span className="text-indigo-600">ID</span>

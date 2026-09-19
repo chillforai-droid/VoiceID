@@ -248,105 +248,50 @@ export default function UserProfilePage() {
     }
   };
 
-  if (profileLoading) return <div className="flex justify-center p-20"><Loader2 className="animate-spin text-blue-500" size={32}/></div>;
-  if (!profile) return <div className="text-center py-20">Profile not found</div>;
+  if (profileLoading) return <div className="flex min-h-[60vh] items-center justify-center"><Loader2 className="animate-spin text-indigo-600" size={34}/></div>;
+  if (!profile) return <div className="py-20 text-center font-semibold text-slate-500">Profile not found</div>;
+
+  const isOwnProfile = user?.id === resolvedProfileId;
+  const profileUrl = getProfileShareUrl();
 
   return (
-    <div className="max-w-xl mx-auto p-4 sm:p-8">
-      <div className="overflow-hidden rounded-[2rem] border border-gray-200 bg-white shadow-xl shadow-blue-100/40">
-        <div className="bg-gradient-to-br from-blue-600 via-indigo-600 to-purple-700 px-6 pt-8 pb-16 text-white relative">
-          <div className="absolute inset-0 opacity-15 bg-[radial-gradient(circle_at_top_right,_white,_transparent_45%)]" />
-          <div className="relative flex items-center justify-between gap-3">
-            <div>
-              <p className="text-xs font-bold uppercase tracking-[0.25em] text-white/70">VoiceID Profile</p>
-              <p className="mt-1 text-sm text-white/80">A profile you can share anywhere</p>
-            </div>
-            <button onClick={handleShare} disabled={sharing} className="rounded-full bg-white/15 p-3 backdrop-blur hover:bg-white/25 transition" aria-label="Share VoiceID profile">
-              <Share size={20} />
-            </button>
-          </div>
-        </div>
-
-        <div className="relative px-5 sm:px-8 pb-8 -mt-12">
-          <div className="w-24 h-24 sm:w-32 sm:h-32 rounded-[2rem] bg-gray-100 mx-auto mb-4 overflow-hidden border-4 border-white shadow-lg relative">
-              {profile.avatar_url ? <img src={profile.avatar_url} alt={`${profile.display_name} VoiceID profile`} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-3xl font-bold text-blue-600">{profile.display_name?.slice(0,1)?.toUpperCase() || '?'}</div>}
-              {user?.id !== resolvedProfileId && (
-                  <div className={`absolute bottom-2 right-2 w-4 h-4 rounded-full border-2 border-white ${isOnline ? 'bg-green-500' : 'bg-gray-400'}`} />
-              )}
+    <div className="min-h-full bg-[#f7f8ff] px-4 pb-8 pt-5 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-5xl space-y-4">
+        <section className="overflow-hidden rounded-[32px] bg-white shadow-sm ring-1 ring-slate-100">
+          <div className="relative h-52 overflow-hidden bg-gradient-to-r from-blue-700 via-indigo-700 to-fuchsia-700 sm:h-64">
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_10%,rgba(255,255,255,.3),transparent_35%),radial-gradient(circle_at_80%_80%,rgba(236,72,153,.3),transparent_40%)]" />
+            <div className="absolute bottom-5 left-5 max-w-xs text-white sm:left-8"><p className="text-xs font-bold uppercase tracking-[0.28em] text-white/70">More Than Just a Profile</p><p className="mt-2 text-sm text-white/90 sm:text-base">Your Voice. Your Story. Your Identity.</p></div>
+            <button onClick={handleShare} disabled={sharing} className="absolute right-5 top-5 rounded-full bg-white/15 p-3 text-white backdrop-blur hover:bg-white/25" aria-label="Share profile"><Share size={21}/></button>
           </div>
 
-          <div className="text-center">
-            <h1 className="text-2xl sm:text-4xl font-extrabold tracking-tight mb-1 break-words text-gray-900">{profile.display_name}</h1>
-            <p className="text-blue-600 font-semibold text-base sm:text-lg break-words">@{profile.username}</p>
-            <p className="text-gray-500 text-sm mt-1">{user?.id === resolvedProfileId ? 'Your VoiceID' : isOnline ? '🟢 Online' : '⚪ Offline'}</p>
-
-            <div className="mt-5 rounded-2xl bg-gray-50 border border-gray-100 p-4 text-left">
-              <p className="text-xs font-bold uppercase tracking-wider text-gray-400 mb-2">VoiceID</p>
-              <div className="flex items-center justify-between gap-3">
-                <code className="font-bold text-gray-900 break-all">@{profile.username}</code>
-                <button onClick={handleCopyProfile} className="shrink-0 rounded-full bg-white border border-gray-200 p-2 text-gray-600 hover:bg-gray-100" aria-label="Copy profile details">
-                  {copied ? <Check size={17} className="text-green-600" /> : <Copy size={17} />}
-                </button>
+          <div className="relative px-5 pb-7 sm:px-8">
+            <div className="-mt-16 flex flex-col items-center sm:-mt-20">
+              <div className="relative h-32 w-32 overflow-hidden rounded-[34px] border-4 border-white bg-slate-100 shadow-xl sm:h-36 sm:w-36">
+                {profile.avatar_url ? <img src={profile.avatar_url} alt={profile.display_name} className="h-full w-full object-cover"/> : <div className="flex h-full w-full items-center justify-center text-4xl font-extrabold text-indigo-600">{(profile.display_name || 'V').slice(0,1).toUpperCase()}</div>}
+                <span className={`absolute bottom-2 right-2 h-5 w-5 rounded-full border-4 border-white ${isOnline ? 'bg-emerald-500' : 'bg-slate-300'}`} />
               </div>
+              <div className="mt-4 flex items-center gap-2"><h1 className="text-3xl font-extrabold tracking-tight text-slate-950">{profile.display_name}</h1><span className="flex h-6 w-6 items-center justify-center rounded-full bg-blue-600 text-xs font-bold text-white">✓</span></div>
+              <div className="mt-1 flex items-center gap-2 text-lg font-semibold text-blue-600">@{profile.username}<button onClick={handleCopyProfile} className="rounded-full p-1.5 text-slate-400 hover:bg-slate-100" aria-label="Copy profile"><Copy size={16}/></button></div>
+              <p className="mt-2 max-w-xl text-center text-slate-500">{profile.bio || 'Your VoiceID profile — share your voice and connect with people.'}</p>
+              <div className="mt-3 flex flex-wrap justify-center gap-3 text-xs text-slate-500"><span className="rounded-full bg-slate-50 px-3 py-1.5">🟢 {isOnline ? 'Online' : 'Offline'}</span><span className="rounded-full bg-slate-50 px-3 py-1.5">VoiceID @{profile.username}</span></div>
             </div>
 
-            <p className="text-gray-600 text-base sm:text-lg mt-5 leading-relaxed break-words">{profile.bio || 'Connect with me on VoiceID.'}</p>
-
-            {!user && (
-              <div className="mt-6 rounded-2xl border border-blue-100 bg-blue-50 p-4 text-left">
-                <div className="flex gap-3">
-                  <UserRoundPlus className="text-blue-600 shrink-0" size={22} />
-                  <div>
-                    <p className="font-bold text-gray-900">Connect with @{profile.username}</p>
-                    <p className="text-sm text-gray-600 mt-1">Create your free VoiceID account or sign in to send a friend request.</p>
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-2 mt-4">
-                  <button onClick={() => navigate(`/auth/signup?ref=${encodeURIComponent(profile.username)}`)} className="py-3 rounded-xl bg-blue-600 text-white font-bold hover:bg-blue-700 transition">Create VoiceID</button>
-                  <button onClick={() => navigate(`/auth/login?ref=${encodeURIComponent(profile.username)}`)} className="py-3 rounded-xl bg-white border border-blue-200 text-blue-700 font-bold hover:bg-blue-100 transition"><LogIn size={16} className="inline mr-1" /> Sign in</button>
-                </div>
-              </div>
-            )}
-
-            {user?.id === resolvedProfileId && (
-              <div className="flex flex-wrap gap-3 justify-center mt-7">
-                <button onClick={() => navigate('/dashboard/profile/edit')} className="px-6 py-3 bg-blue-600 text-white rounded-full font-semibold">Edit Profile</button>
-                <button onClick={handleShare} disabled={sharing} className="px-5 py-3 bg-gray-100 text-gray-700 rounded-full font-semibold hover:bg-gray-200 transition"><Share size={17} className="inline mr-2" /> Share Profile</button>
-              </div>
-            )}
-
-            {user?.id !== resolvedProfileId && user && (
-              <>
-                {contactRelation.status === null && (
-                  <button onClick={() => handleContactAction('add')} className="mt-6 w-full py-4 rounded-2xl bg-blue-600 text-white font-bold shadow-lg shadow-blue-200 hover:bg-blue-700 transition flex items-center justify-center gap-2">
-                    <UserPlus size={20} /> Send Friend Request
-                  </button>
-                )}
-                {contactRelation.status === 'pending' && !contactRelation.isIncoming && <div className="mt-6 py-4 rounded-2xl bg-amber-50 text-amber-700 font-semibold">Friend request pending</div>}
-                {contactRelation.status === 'pending' && contactRelation.isIncoming && (
-                  <div className="mt-6 grid grid-cols-2 gap-3">
-                    <button onClick={() => handleContactAction('accept')} className="py-4 rounded-2xl bg-green-600 text-white font-bold"><UserCheck size={19} className="inline mr-1" /> Accept</button>
-                    <button onClick={() => handleContactAction('reject')} className="py-4 rounded-2xl bg-red-50 text-red-700 font-bold"><UserX size={19} className="inline mr-1" /> Decline</button>
-                  </div>
-                )}
-
-                <div className="flex flex-wrap gap-3 justify-center mt-5">
-                  <button onClick={handleCall} disabled={!isOnline || contactRelation.status !== 'accepted'} aria-label="Call" title="Call" className={`min-w-[92px] px-4 py-3 rounded-2xl transition flex items-center justify-center gap-2 font-semibold ${!isOnline || contactRelation.status !== 'accepted' ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-blue-50 text-blue-600 hover:bg-blue-100'}`}><Phone size={20} /><span>Call</span></button>
-                  <button onClick={handleVideoCall} disabled={!isOnline || contactRelation.status !== 'accepted'} aria-label="Video Call" title="Video Call" className={`min-w-[92px] px-4 py-3 rounded-2xl transition flex items-center justify-center gap-2 font-semibold ${!isOnline || contactRelation.status !== 'accepted' ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-blue-50 text-blue-600 hover:bg-blue-100'}`}><Video size={20} /><span>Video</span></button>
-                  <button onClick={handleMessageAction} aria-label="Message" title="Message" className="min-w-[108px] px-4 py-3 bg-purple-50 text-purple-600 rounded-2xl hover:bg-purple-100 transition flex items-center justify-center gap-2 font-semibold"><MessageCircle size={20} /><span>Message</span></button>
-                  <button onClick={handleShare} aria-label="Share profile" title="Share profile" className="min-w-[92px] px-4 py-3 bg-gray-100 text-gray-600 rounded-2xl hover:bg-gray-200 transition flex items-center justify-center gap-2 font-semibold"><Share size={20} /><span>Share</span></button>
-                  {contactRelation.status === 'accepted' && <button onClick={() => handleContactAction('remove')} aria-label="Remove contact" title="Remove contact" className="p-3 bg-red-50 text-red-600 rounded-2xl hover:bg-red-100 transition"><UserX size={20} /></button>}
-                  {contactRelation.status !== 'blocked' ? <button onClick={() => handleContactAction('block')} aria-label="Block user" title="Block user" className="p-3 bg-red-50 text-red-600 rounded-2xl hover:bg-red-100 transition"><Ban size={20} /></button> : <button onClick={() => handleContactAction('unblock')} aria-label="Unblock user" title="Unblock user" className="p-3 bg-green-50 text-green-600 rounded-2xl hover:bg-green-100 transition"><UserPlus size={20} /></button>}
-                </div>
-              </>
-            )}
-
-            <div className="mt-7 flex items-center justify-center gap-2 text-xs text-gray-400">
-              <Link2 size={14} /> Share this profile to invite people to VoiceID
+            <div className="mt-6 grid grid-cols-2 gap-2 sm:flex sm:justify-center">
+              {isOwnProfile ? <><button onClick={() => navigate('/dashboard/profile/edit')} className="rounded-full bg-gradient-to-r from-blue-600 to-violet-600 px-6 py-3 font-bold text-white shadow-lg"><span className="mr-2">✎</span>Edit Profile</button><button onClick={handleShare} disabled={sharing} className="rounded-full bg-slate-100 px-6 py-3 font-bold text-slate-700"><Share size={17} className="mr-2 inline"/>Share Profile</button></> : user ? <><button onClick={() => handleContactAction(contactRelation.status === 'pending' && contactRelation.isIncoming ? 'accept' : 'add')} className="rounded-full bg-gradient-to-r from-blue-600 to-violet-600 px-5 py-3 font-bold text-white">{contactRelation.status === 'accepted' ? 'Friends' : contactRelation.status === 'pending' ? (contactRelation.isIncoming ? 'Accept Request' : 'Request Sent') : 'Add Friend'}</button><button onClick={handleMessageAction} className="rounded-full bg-slate-100 px-5 py-3 font-bold text-slate-700"><MessageCircle size={17} className="mr-2 inline"/>Message</button></> : <><button onClick={() => navigate(`/auth/signup?ref=${encodeURIComponent(profile.username)}`)} className="rounded-full bg-gradient-to-r from-blue-600 to-violet-600 px-5 py-3 font-bold text-white">Create VoiceID</button><button onClick={() => navigate(`/auth/login?ref=${encodeURIComponent(profile.username)}`)} className="rounded-full bg-slate-100 px-5 py-3 font-bold text-slate-700">Sign In</button></>}
             </div>
-            {copied && <p className="mt-2 text-sm font-semibold text-green-600">Profile details copied</p>}
+
+            {isOwnProfile && <div className="mt-5 rounded-3xl bg-gradient-to-r from-amber-50 via-pink-50 to-violet-50 p-4 ring-1 ring-white"><div className="flex items-center gap-3"><span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-amber-100 text-xl">👑</span><div className="flex-1"><p className="font-extrabold text-slate-950">VoiceID Creator</p><p className="text-sm text-slate-500">Create amazing rooms, grow your community and make your voice count.</p></div><button onClick={() => navigate('/dashboard/rooms')} className="rounded-full bg-gradient-to-r from-blue-600 to-violet-600 px-4 py-2 text-sm font-bold text-white">Explore</button></div></div>}
           </div>
-        </div>
+        </section>
+
+        <div className="rounded-3xl bg-white p-1 shadow-sm ring-1 ring-slate-100"><div className="grid grid-cols-4 text-center text-sm font-bold text-slate-500"><button className="rounded-2xl bg-indigo-50 py-3 text-indigo-700">Profile</button><button onClick={() => navigate('/dashboard/rooms')} className="py-3">Rooms</button><button className="py-3">Media</button><button className="py-3">About</button></div></div>
+
+        <section className="grid gap-4 lg:grid-cols-[1.5fr_1fr]">
+          <div className="rounded-3xl bg-white p-5 shadow-sm ring-1 ring-slate-100"><div className="flex items-center justify-between"><h2 className="text-lg font-extrabold">About {profile.display_name}</h2><span className="text-xs text-slate-400">VoiceID</span></div><p className="mt-4 whitespace-pre-wrap text-sm leading-7 text-slate-600">{profile.bio || 'This user has not added a bio yet.'}</p><div className="mt-5 rounded-2xl bg-slate-50 p-4"><p className="text-xs font-bold uppercase tracking-wider text-slate-400">Public profile link</p><div className="mt-2 flex items-center gap-2"><Link2 size={17} className="text-indigo-600"/><span className="min-w-0 flex-1 truncate text-sm font-semibold text-indigo-700">{profileUrl}</span><button onClick={handleCopyProfile} className="rounded-full bg-white p-2 ring-1 ring-slate-200"><Copy size={16}/></button></div></div></div>
+          <div className="rounded-3xl bg-white p-5 shadow-sm ring-1 ring-slate-100"><h2 className="text-lg font-extrabold">VoiceID Actions</h2><div className="mt-3 space-y-2"><button onClick={handleShare} className="flex w-full items-center gap-3 rounded-2xl bg-slate-50 p-3 text-left font-semibold text-slate-700"><Share size={19} className="text-indigo-600"/>Share profile</button>{!isOwnProfile && user && <><button onClick={handleCall} disabled={!isOnline || contactRelation.status !== 'accepted'} className="flex w-full items-center gap-3 rounded-2xl bg-indigo-50 p-3 text-left font-semibold text-indigo-700 disabled:opacity-40"><Phone size={19}/>Voice call</button><button onClick={handleVideoCall} disabled={!isOnline || contactRelation.status !== 'accepted'} className="flex w-full items-center gap-3 rounded-2xl bg-violet-50 p-3 text-left font-semibold text-violet-700 disabled:opacity-40"><Video size={19}/>Video call</button></>}</div></div>
+        </section>
+
+        {copied && <div className="fixed bottom-24 left-1/2 z-50 -translate-x-1/2 rounded-full bg-slate-950 px-5 py-2.5 text-sm font-bold text-white shadow-xl"><Check size={16} className="mr-2 inline text-emerald-400"/>Profile copied</div>}
       </div>
     </div>
   );

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { Users, Plus, KeyRound, Crown, Compass, Globe2, Star, Search, Camera, Shield } from 'lucide-react';
+import { Users, Plus, KeyRound, Crown, Compass, Star, Search, Mic2, MoreHorizontal, Sparkles } from 'lucide-react';
 import { useRooms, usePublicRooms, useCreatorRooms, ROOM_CATEGORIES, CREATOR_ROOM_CATEGORIES } from '../hooks/useRooms';
 import { uploadImageToCloudinary } from '../lib/uploadImageToCloudinary';
 import CreatorBadge from '../components/room/CreatorBadge';
@@ -10,41 +10,30 @@ export default function RoomsPage() {
   const sharedCode = searchParams.get('code');
   const [tab, setTab] = useState<'mine' | 'explore' | 'creators'>('mine');
 
+  const consumeCode = () => { searchParams.delete('code'); setSearchParams(searchParams, { replace: true }); };
+
   return (
-    <div className="max-w-xl mx-auto p-4 space-y-5">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900">Rooms</h1>
-      </div>
+    <div className="min-h-full bg-[#f7f8ff] px-4 pb-8 pt-5 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-6xl space-y-5">
+        <section className="flex items-start justify-between gap-4">
+          <div><p className="text-xs font-bold uppercase tracking-[0.22em] text-indigo-600">VoiceID Community</p><h1 className="mt-1 text-3xl font-extrabold tracking-tight text-slate-950 sm:text-4xl">Rooms</h1><p className="mt-1 text-slate-500">Discover, join and create voice rooms</p></div>
+          <button onClick={() => window.dispatchEvent(new CustomEvent('voiceid:create-room'))} className="hidden items-center gap-2 rounded-full bg-gradient-to-r from-blue-600 to-violet-600 px-5 py-3 font-bold text-white shadow-lg sm:flex"><Plus size={20}/> Create Room</button>
+        </section>
 
-      <div className="flex bg-gray-100 rounded-xl p-1">
-        <button
-          onClick={() => setTab('mine')}
-          className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-sm font-medium transition-colors ${tab === 'mine' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500'}`}
-        >
-          <Users size={16} /> My Rooms
-        </button>
-        <button
-          onClick={() => setTab('explore')}
-          className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-sm font-medium transition-colors ${tab === 'explore' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500'}`}
-        >
-          <Compass size={16} /> Explore
-        </button>
-        <button
-          onClick={() => setTab('creators')}
-          className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-sm font-medium transition-colors ${tab === 'creators' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500'}`}
-        >
-          <Star size={16} /> Creators
-        </button>
-      </div>
+        <div className="flex rounded-2xl bg-white p-1 shadow-sm ring-1 ring-slate-100">
+          {([['mine','My Rooms',Users],['explore','Explore',Compass],['creators','Creators',Star]] as const).map(([value,label,Icon]) => <button key={value} onClick={() => setTab(value)} className={`flex flex-1 items-center justify-center gap-2 rounded-xl py-3 text-sm font-bold transition ${tab === value ? 'bg-gradient-to-r from-blue-600 to-violet-600 text-white shadow-md' : 'text-slate-500'}`}><Icon size={18}/>{label}</button>)}
+        </div>
 
-      {tab === 'mine' && (
-        <MyRooms
-          initialJoinCode={sharedCode || undefined}
-          onConsumedInitialCode={() => { searchParams.delete('code'); setSearchParams(searchParams, { replace: true }); }}
-        />
-      )}
-      {tab === 'explore' && <Explore />}
-      {tab === 'creators' && <CreatorRoomsTab />}
+        <section className="relative overflow-hidden rounded-[28px] bg-gradient-to-r from-[#11134d] via-[#24206e] to-[#4b1689] p-6 text-white shadow-[0_16px_45px_rgba(31,24,96,0.2)] sm:p-7">
+          <div className="absolute -right-16 -top-20 h-64 w-64 rounded-full bg-fuchsia-500/25 blur-3xl"/><div className="relative flex items-center justify-between gap-4"><div><p className="text-xs font-bold uppercase tracking-[0.22em] text-indigo-200">Voice Rooms</p><h2 className="mt-1 text-2xl font-extrabold sm:text-3xl">Talk · Share · Learn · Make Friends</h2><p className="mt-2 text-sm text-indigo-200">Join public conversations or build your own community.</p></div><div className="hidden h-28 w-28 items-center justify-center rounded-full bg-white/10 ring-1 ring-white/20 sm:flex"><Mic2 size={56}/></div></div>
+        </section>
+
+        <section><div className="mb-3 flex items-center justify-between"><h2 className="text-xl font-extrabold text-slate-950">Quick Actions</h2><span className="text-sm font-semibold text-slate-500">Room tools</span></div><div className="grid grid-cols-2 gap-3 sm:grid-cols-4"><button onClick={() => window.dispatchEvent(new CustomEvent('voiceid:create-room'))} className="rounded-2xl bg-white p-4 text-left shadow-sm ring-1 ring-slate-100"><span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-violet-100 text-violet-600"><Plus/></span><p className="mt-3 font-bold">Create Room</p><p className="text-xs text-slate-500">Start a new room</p></button><button onClick={() => { setTab('mine'); window.dispatchEvent(new CustomEvent('voiceid:join-room')); }} className="rounded-2xl bg-white p-4 text-left shadow-sm ring-1 ring-slate-100"><span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-600"><Users/></span><p className="mt-3 font-bold">Join with Code</p><p className="text-xs text-slate-500">Enter room code</p></button><button onClick={() => setTab('explore')} className="rounded-2xl bg-white p-4 text-left shadow-sm ring-1 ring-slate-100"><span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-pink-100 text-pink-600"><Search/></span><p className="mt-3 font-bold">Find Rooms</p><p className="text-xs text-slate-500">Explore public rooms</p></button><button onClick={() => setTab('creators')} className="rounded-2xl bg-white p-4 text-left shadow-sm ring-1 ring-slate-100"><span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-blue-100 text-blue-600"><Crown/></span><p className="mt-3 font-bold">Creators</p><p className="text-xs text-slate-500">Discover creators</p></button></div></section>
+
+        {tab === 'mine' && <MyRooms initialJoinCode={sharedCode || undefined} onConsumedInitialCode={consumeCode}/>} 
+        {tab === 'explore' && <Explore/>}
+        {tab === 'creators' && <CreatorRoomsTab/>}
+      </div>
     </div>
   );
 }
@@ -52,510 +41,24 @@ export default function RoomsPage() {
 function MyRooms({ initialJoinCode, onConsumedInitialCode }: { initialJoinCode?: string; onConsumedInitialCode?: () => void }) {
   const navigate = useNavigate();
   const { rooms, loading, createRoom, joinByCode } = useRooms();
-  const [showCreate, setShowCreate] = useState(false);
-  const [showJoin, setShowJoin] = useState(false);
-  const [roomType, setRoomType] = useState<'normal' | 'creator'>('normal');
-  const [name, setName] = useState('');
-  const [description, setDescription] = useState('');
-  const [isPublic, setIsPublic] = useState(false);
-  const [category, setCategory] = useState<string>('');
-  const [creatorDisplayName, setCreatorDisplayName] = useState('');
-  const [rules, setRules] = useState('');
-  const [avatarUrl, setAvatarUrl] = useState('');
-  const [coverUrl, setCoverUrl] = useState('');
-  const [uploadingAvatar, setUploadingAvatar] = useState(false);
-  const [uploadingCover, setUploadingCover] = useState(false);
-  const [code, setCode] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [feedback, setFeedback] = useState<string | null>(null);
-
-  // A shared room link (voiceid.online/dashboard/rooms?code=XXXXXX) lands
-  // here — open the join modal pre-filled instead of making the person
-  // type the code back in by hand.
-  useEffect(() => {
-    if (!initialJoinCode) return;
-    setCode(initialJoinCode.toUpperCase());
-    setShowJoin(true);
-    onConsumedInitialCode?.();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initialJoinCode]);
-
-  const isCreator = roomType === 'creator';
-  const categoryOptions = isCreator ? CREATOR_ROOM_CATEGORIES : ROOM_CATEGORIES;
-
-  const handleImagePick = async (e: React.ChangeEvent<HTMLInputElement>, kind: 'avatar' | 'cover') => {
-    const file = e.target.files?.[0];
-    e.target.value = '';
-    if (!file) return;
-    const setUploading = kind === 'avatar' ? setUploadingAvatar : setUploadingCover;
-    setUploading(true);
-    try {
-      const url = await uploadImageToCloudinary(file, 'voiceid/rooms', `${crypto.randomUUID()}-${kind}`);
-      if (kind === 'avatar') setAvatarUrl(url); else setCoverUrl(url);
-    } catch (err) {
-      console.error(`Failed to upload room ${kind}:`, err);
-      setFeedback(`${kind === 'avatar' ? 'Avatar' : 'Cover'} upload nahi ho paya.`);
-    } finally {
-      setUploading(false);
-    }
-  };
-
-  const resetCreateForm = () => {
-    setName(''); setDescription(''); setIsPublic(false); setCategory('');
-    setCreatorDisplayName(''); setRules(''); setAvatarUrl(''); setCoverUrl(''); setRoomType('normal');
-  };
-
-  const handleCreate = async () => {
-    if (!name.trim()) return;
-    setBusy(true);
-    try {
-      const room = await createRoom(name, description, isPublic, category, isCreator ? {
-        roomType: 'creator', avatarUrl: avatarUrl || null, coverUrl: coverUrl || null,
-        rules, creatorDisplayName,
-      } : undefined);
-      setShowCreate(false);
-      resetCreateForm();
-      if (isCreator && room?.id) navigate(`/dashboard/rooms/${room.id}/manage`);
-    } catch (err: any) {
-      setFeedback(err?.message || 'Room create nahi ho paya.');
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const handleJoin = async () => {
-    if (!code.trim()) return;
-    setBusy(true);
-    setFeedback(null);
-    try {
-      const result = await joinByCode(code);
-      if (result.joined) setFeedback('Room join ho gaya!');
-      else if (result.requested) setFeedback(`Request bhej di gayi — "${result.roomName}" ke owner ki approval ka wait karein.`);
-      else if (result.alreadyRequested) setFeedback('Aap pehle se request bhej chuke hain.');
-      else if (result.alreadyMember) setFeedback('Aap pehle se is room ke member hain.');
-      else if (result.banned) setFeedback('Is room se aapko ban kiya gaya hai.');
-      setCode('');
-    } catch (err: any) {
-      setFeedback(err?.message || 'Room nahi mila. Code check karein.');
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  return (
-    <div className="space-y-4">
-      <div className="flex gap-2">
-        <button
-          onClick={() => { setShowJoin(true); setFeedback(null); }}
-          className="p-2.5 bg-white border border-gray-200 rounded-xl text-gray-600 hover:bg-gray-50"
-          aria-label="Join by code"
-        >
-          <KeyRound size={18} />
-        </button>
-        <button
-          onClick={() => { setShowCreate(true); setFeedback(null); }}
-          className="flex-1 flex items-center justify-center gap-1.5 px-4 py-2.5 bg-blue-600 text-white rounded-xl font-medium hover:bg-blue-700"
-        >
-          <Plus size={18} /> New Room
-        </button>
-      </div>
-
-      {loading ? (
-        <div className="text-center text-gray-400 py-10">Loading...</div>
-      ) : rooms.length === 0 ? (
-        <div className="text-center py-16 text-gray-500">
-          <Users className="mx-auto mb-3 text-gray-300" size={40} />
-          <p>Abhi koi room nahi hai.</p>
-          <p className="text-sm">Ek naya room banayein ya code se join karein.</p>
-        </div>
-      ) : (
-        <div className="space-y-3">
-          {rooms.map(room => (
-            <Link
-              key={room.id}
-              to={`/dashboard/rooms/${room.id}`}
-              className="flex items-center gap-4 p-4 bg-white border border-gray-100 rounded-2xl hover:border-blue-200 transition-colors shadow-sm"
-            >
-              {room.avatar_url ? (
-                <img src={room.avatar_url} className="w-12 h-12 rounded-xl object-cover shrink-0" alt="" />
-              ) : (
-                <div className="w-12 h-12 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center shrink-0">
-                  <Users size={22} />
-                </div>
-              )}
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-1.5">
-                  <span className="font-medium text-gray-900 truncate">{room.name}</span>
-                  {room.my_role === 'owner' && <Crown size={14} className="text-amber-500 shrink-0" />}
-                  {room.my_role === 'moderator' && <Shield size={13} className="text-blue-500 shrink-0" />}
-                  {room.is_public && <Globe2 size={13} className="text-blue-500 shrink-0" />}
-                  {room.room_type === 'creator' && <CreatorBadge />}
-                </div>
-                <p className="text-sm text-gray-500 truncate">{room.member_count} member{room.member_count !== 1 ? 's' : ''} · Code: {room.room_code}</p>
-              </div>
-              {room.my_role === 'owner' && (
-                <span
-                  role="button"
-                  onClick={e => { e.preventDefault(); navigate(`/dashboard/rooms/${room.id}/manage`); }}
-                  className="p-2 text-gray-400 hover:text-blue-600 shrink-0"
-                  aria-label="Manage room"
-                >
-                  <Shield size={18} />
-                </span>
-              )}
-            </Link>
-          ))}
-        </div>
-      )}
-
-      {showCreate && (
-        <Modal onClose={() => { setShowCreate(false); resetCreateForm(); }} title="Naya Room">
-          <div className="space-y-3 max-h-[65vh] overflow-y-auto pr-0.5">
-            <div className="flex bg-gray-100 rounded-xl p-1">
-              <button
-                onClick={() => setRoomType('normal')}
-                className={`flex-1 py-2 rounded-lg text-sm font-medium ${roomType === 'normal' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500'}`}
-              >
-                Normal Room
-              </button>
-              <button
-                onClick={() => setRoomType('creator')}
-                className={`flex-1 py-2 rounded-lg text-sm font-medium flex items-center justify-center gap-1 ${roomType === 'creator' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500'}`}
-              >
-                <Star size={13} /> Creator Room
-              </button>
-            </div>
-
-            {isCreator && (
-              <>
-                <label className="block aspect-[3/1] bg-gray-100 rounded-xl overflow-hidden relative cursor-pointer">
-                  {coverUrl && <img src={coverUrl} className="w-full h-full object-cover" alt="" />}
-                  <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/10 text-gray-600">
-                    <Camera size={18} />
-                    <span className="text-[10px]">{uploadingCover ? 'Uploading...' : 'Cover image'}</span>
-                  </div>
-                  <input type="file" accept="image/*" className="hidden" onChange={e => handleImagePick(e, 'cover')} />
-                </label>
-                <div className="flex items-center gap-3">
-                  <label className="w-14 h-14 rounded-full bg-gray-100 overflow-hidden relative cursor-pointer shrink-0">
-                    {avatarUrl && <img src={avatarUrl} className="w-full h-full object-cover" alt="" />}
-                    <div className="absolute inset-0 flex items-center justify-center bg-black/10 text-gray-600">
-                      <Camera size={14} />
-                    </div>
-                    <input type="file" accept="image/*" className="hidden" onChange={e => handleImagePick(e, 'avatar')} />
-                  </label>
-                  <span className="text-xs text-gray-500">{uploadingAvatar ? 'Uploading...' : 'Room logo/avatar'}</span>
-                </div>
-              </>
-            )}
-
-            <input
-              value={name}
-              onChange={e => setName(e.target.value)}
-              placeholder="Room ka naam"
-              className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
-              maxLength={60}
-              autoFocus
-            />
-            <textarea
-              value={description}
-              onChange={e => setDescription(e.target.value)}
-              placeholder="Description (optional)"
-              className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-              rows={2}
-              maxLength={200}
-            />
-
-            {isCreator && (
-              <input
-                value={creatorDisplayName}
-                onChange={e => setCreatorDisplayName(e.target.value)}
-                placeholder="Creator display name (optional)"
-                className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
-                maxLength={60}
-              />
-            )}
-
-            <select
-              value={category}
-              onChange={e => setCategory(e.target.value)}
-              className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm bg-white"
-            >
-              <option value="">Category chunein</option>
-              {categoryOptions.map(c => <option key={c} value={c}>{c}</option>)}
-            </select>
-
-            {isCreator && (
-              <textarea
-                value={rules}
-                onChange={e => setRules(e.target.value)}
-                placeholder="Room rules (optional)"
-                className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-                rows={2}
-                maxLength={500}
-              />
-            )}
-
-            <label className="flex items-center gap-2.5 text-sm text-gray-700">
-              <input type="checkbox" checked={isPublic} onChange={e => setIsPublic(e.target.checked)} className="w-4 h-4 accent-blue-600" />
-              Public room — koi bhi turant join kar sakega (Explore me dikhega)
-            </label>
-
-            {feedback && <p className="text-sm text-red-600">{feedback}</p>}
-            <button
-              onClick={handleCreate}
-              disabled={busy || !name.trim() || uploadingAvatar || uploadingCover}
-              className="w-full py-2.5 bg-blue-600 text-white rounded-xl font-medium disabled:opacity-50"
-            >
-              {busy ? 'Banaya ja raha hai...' : 'Room Banayein'}
-            </button>
-          </div>
-        </Modal>
-      )}
-
-      {showJoin && (
-        <Modal onClose={() => setShowJoin(false)} title="Code se Join Karein">
-          <div className="space-y-3">
-            <input
-              value={code}
-              onChange={e => setCode(e.target.value.toUpperCase())}
-              placeholder="Room code (e.g. AB12CD)"
-              className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 tracking-widest uppercase"
-              maxLength={6}
-              autoFocus
-            />
-            {feedback && <p className="text-sm text-gray-600">{feedback}</p>}
-            <button
-              onClick={handleJoin}
-              disabled={busy || !code.trim()}
-              className="w-full py-2.5 bg-blue-600 text-white rounded-xl font-medium disabled:opacity-50"
-            >
-              {busy ? 'Bhej rahe hain...' : 'Join Karein'}
-            </button>
-          </div>
-        </Modal>
-      )}
-    </div>
-  );
+  const [showCreate, setShowCreate] = useState(false); const [showJoin, setShowJoin] = useState(false);
+  const [roomType, setRoomType] = useState<'normal'|'creator'>('normal'); const [name,setName]=useState(''); const [description,setDescription]=useState(''); const [isPublic,setIsPublic]=useState(false); const [category,setCategory]=useState(''); const [creatorDisplayName,setCreatorDisplayName]=useState(''); const [rules,setRules]=useState(''); const [avatarUrl,setAvatarUrl]=useState(''); const [coverUrl,setCoverUrl]=useState(''); const [uploading,setUploading]=useState<'avatar'|'cover'|null>(null); const [code,setCode]=useState(initialJoinCode || ''); const [busy,setBusy]=useState(false); const [feedback,setFeedback]=useState<string|null>(null);
+  useEffect(()=>{ if(initialJoinCode){setCode(initialJoinCode.toUpperCase());setShowJoin(true);onConsumedInitialCode?.();}},[initialJoinCode]);
+  useEffect(()=>{ const create=()=>setShowCreate(true); const join=()=>setShowJoin(true); window.addEventListener('voiceid:create-room',create); window.addEventListener('voiceid:join-room',join); return()=>{window.removeEventListener('voiceid:create-room',create);window.removeEventListener('voiceid:join-room',join)};},[]);
+  const handleImage=async(e:React.ChangeEvent<HTMLInputElement>,kind:'avatar'|'cover')=>{const file=e.target.files?.[0];e.target.value='';if(!file)return;setUploading(kind);try{const url=await uploadImageToCloudinary(file,'voiceid/rooms',`${crypto.randomUUID()}-${kind}`);kind==='avatar'?setAvatarUrl(url):setCoverUrl(url)}catch{setFeedback('Image upload nahi ho paya.')}finally{setUploading(null)}};
+  const reset=()=>{setName('');setDescription('');setIsPublic(false);setCategory('');setCreatorDisplayName('');setRules('');setAvatarUrl('');setCoverUrl('');setRoomType('normal')};
+  const create=async()=>{if(!name.trim())return;setBusy(true);setFeedback(null);try{const room=await createRoom(name,description,isPublic,category,roomType==='creator'?{roomType:'creator',avatarUrl:avatarUrl||null,coverUrl:coverUrl||null,rules,creatorDisplayName}:undefined);setShowCreate(false);reset();if(roomType==='creator'&&room?.id)navigate(`/dashboard/rooms/${room.id}/manage`)}catch(e:any){setFeedback(e?.message||'Room create nahi ho paya.')}finally{setBusy(false)}};
+  const join=async()=>{if(!code.trim())return;setBusy(true);setFeedback(null);try{const r=await joinByCode(code);if(r.joined&&r.roomId)navigate(`/dashboard/rooms/${r.roomId}`);else if(r.requested)setFeedback(`Request bhej di gayi — "${r.roomName}" owner approval ka wait karein.`);else if(r.alreadyMember)setFeedback('Aap pehle se is room ke member hain.');else setFeedback('Room join nahi ho paya.')}catch(e:any){setFeedback(e?.message||'Invalid room code.')}finally{setBusy(false)}};
+  return <section><div className="mb-3 flex items-center justify-between"><h2 className="text-xl font-extrabold text-slate-950">My Rooms</h2><div className="flex gap-2"><button onClick={()=>setShowJoin(true)} className="rounded-full bg-white px-4 py-2 text-sm font-bold text-slate-700 shadow-sm ring-1 ring-slate-200"><KeyRound size={16} className="mr-1 inline"/> Join</button><button onClick={()=>setShowCreate(true)} className="rounded-full bg-gradient-to-r from-blue-600 to-violet-600 px-4 py-2 text-sm font-bold text-white"><Plus size={16} className="mr-1 inline"/> Create</button></div></div>
+    {loading?<div className="py-10 text-center text-slate-400">Loading rooms...</div>:rooms.length===0?<div className="rounded-3xl bg-white p-12 text-center shadow-sm ring-1 ring-slate-100"><Users className="mx-auto mb-3 text-indigo-200" size={44}/><p className="font-bold text-slate-900">No rooms yet</p><p className="mt-1 text-sm text-slate-500">Create a room or join one with a code.</p></div>:<div className="space-y-3">{rooms.map(room=><div key={room.id} className="flex items-center gap-3 rounded-3xl bg-white p-4 shadow-sm ring-1 ring-slate-100"><div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-gradient-to-br from-violet-100 to-indigo-100 text-violet-600">{room.avatar_url?<img src={room.avatar_url} alt="" className="h-full w-full object-cover"/>:<Users size={25}/>}</div><div className="min-w-0 flex-1"><div className="flex items-center gap-2"><p className="truncate font-extrabold text-slate-950">{room.name}</p>{room.room_type==='creator'&&<CreatorBadge/>}</div><p className="mt-1 text-sm text-slate-500">{room.member_count} member{room.member_count!==1?'s':''} · Code: <span className="font-semibold text-indigo-600">{room.room_code}</span></p></div><button onClick={()=>navigate(`/dashboard/rooms/${room.id}`)} className="rounded-full bg-blue-600 px-4 py-2 text-sm font-bold text-white">Join</button><button className="rounded-full p-2 text-slate-400"><MoreHorizontal size={20}/></button></div>)}</div>}
+    {feedback&&<p className="mt-3 rounded-2xl bg-indigo-50 p-3 text-sm text-indigo-700">{feedback}</p>}
+    {showCreate&&<Modal title="Create Room" onClose={()=>setShowCreate(false)}><div className="flex gap-2"><button onClick={()=>setRoomType('normal')} className={`flex-1 rounded-xl p-3 font-bold ${roomType==='normal'?'bg-blue-600 text-white':'bg-slate-100 text-slate-600'}`}>Normal</button><button onClick={()=>setRoomType('creator')} className={`flex-1 rounded-xl p-3 font-bold ${roomType==='creator'?'bg-violet-600 text-white':'bg-slate-100 text-slate-600'}`}>Creator</button></div><input value={name} onChange={e=>setName(e.target.value)} placeholder="Room name" className="w-full rounded-xl border p-3"/><textarea value={description} onChange={e=>setDescription(e.target.value)} placeholder="Description" className="w-full rounded-xl border p-3"/><select value={category} onChange={e=>setCategory(e.target.value)} className="w-full rounded-xl border p-3"><option value="">Category</option>{(roomType==='creator'?CREATOR_ROOM_CATEGORIES:ROOM_CATEGORIES).map(c=><option key={c}>{c}</option>)}</select><label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={isPublic} onChange={e=>setIsPublic(e.target.checked)}/> Public room</label>{roomType==='creator'&&<><input value={creatorDisplayName} onChange={e=>setCreatorDisplayName(e.target.value)} placeholder="Creator name" className="w-full rounded-xl border p-3"/><textarea value={rules} onChange={e=>setRules(e.target.value)} placeholder="Room rules" className="w-full rounded-xl border p-3"/><div className="grid grid-cols-2 gap-2"><label className="rounded-xl border p-3 text-center text-sm">{uploading==='avatar'?'Uploading...':'Room avatar'}<input type="file" accept="image/*" className="mt-2 w-full text-xs" onChange={e=>handleImage(e,'avatar')}/></label><label className="rounded-xl border p-3 text-center text-sm">{uploading==='cover'?'Uploading...':'Cover image'}<input type="file" accept="image/*" className="mt-2 w-full text-xs" onChange={e=>handleImage(e,'cover')}/></label></div></>}<button disabled={busy||!name.trim()} onClick={create} className="w-full rounded-xl bg-gradient-to-r from-blue-600 to-violet-600 py-3 font-bold text-white disabled:opacity-50">{busy?'Creating...':'Create Room'}</button></Modal>}
+    {showJoin&&<Modal title="Join Room" onClose={()=>setShowJoin(false)}><input value={code} onChange={e=>setCode(e.target.value.toUpperCase())} placeholder="Enter 6-character room code" className="w-full rounded-xl border p-3 uppercase"/><button disabled={busy||!code.trim()} onClick={join} className="w-full rounded-xl bg-blue-600 py-3 font-bold text-white disabled:opacity-50">{busy?'Joining...':'Join Room'}</button>{feedback&&<p className="text-sm text-indigo-700">{feedback}</p>}</Modal>}
+  </section>;
 }
 
-function Explore() {
-  const navigate = useNavigate();
-  const [category, setCategory] = useState<string | undefined>(undefined);
-  const { rooms, loading, fetchPublicRooms } = usePublicRooms(category);
-  const { requestToJoin } = useRooms();
-  const [joiningId, setJoiningId] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+function Explore(){const navigate=useNavigate();const[category,setCategory]=useState<string|undefined>();const{rooms,loading}=usePublicRooms(category);const{requestToJoin}=useRooms();const[joining,setJoining]=useState<string|null>(null);return <section><div className="mb-3 flex items-center justify-between"><h2 className="text-xl font-extrabold">Public Rooms</h2><Sparkles className="text-violet-500" size={20}/></div><div className="flex gap-2 overflow-x-auto pb-2"><button onClick={()=>setCategory(undefined)} className={`rounded-full px-4 py-2 text-xs font-bold ${!category?'bg-blue-600 text-white':'bg-white text-slate-600'}`}>All</button>{ROOM_CATEGORIES.map(c=><button key={c} onClick={()=>setCategory(c)} className={`rounded-full px-4 py-2 text-xs font-bold ${category===c?'bg-blue-600 text-white':'bg-white text-slate-600'}`}>{c}</button>)}</div>{loading?<div className="py-10 text-center text-slate-400">Loading...</div>:<div className="mt-3 grid gap-3 sm:grid-cols-2">{rooms.map((room:any)=><div key={room.id} className="rounded-3xl bg-white p-4 shadow-sm ring-1 ring-slate-100"><div className="flex gap-3"><div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500 to-fuchsia-600 text-white"><Mic2/></div><div className="min-w-0 flex-1"><p className="truncate font-extrabold">{room.name}</p><p className="text-xs text-slate-500">{room.category||'General'} · {room.member_count} online</p><p className="mt-1 line-clamp-2 text-sm text-slate-500">{room.description||'Join the conversation.'}</p></div></div><button disabled={joining===room.id} onClick={async()=>{setJoining(room.id);try{const r=await requestToJoin(room.id);if(r.joined)navigate(`/dashboard/rooms/${room.id}`)}finally{setJoining(null)}}} className="mt-3 w-full rounded-full bg-blue-600 py-2.5 text-sm font-bold text-white disabled:opacity-60">{joining===room.id?'Joining...':'Join Room'}</button></div>)}</div>}</section>}
 
-  const handleJoin = async (roomId: string) => {
-    setError(null);
-    setJoiningId(roomId);
-    try {
-      // Every room shown here is public, so this always comes back joined
-      // (no approval step) — see requestToJoin in useRooms.ts.
-      const result = await requestToJoin(roomId);
-      if (result.joined) navigate(`/dashboard/rooms/${roomId}`);
-    } catch (err: any) {
-      setError(err?.message || 'Join nahi ho paya.');
-    } finally {
-      setJoiningId(null);
-    }
-  };
+function CreatorRoomsTab(){const navigate=useNavigate();const[category,setCategory]=useState<string|undefined>();const[search,setSearch]=useState('');const{rooms,loading}=useCreatorRooms(category,search);const{requestToJoin}=useRooms();return <section><div className="mb-3 flex items-center justify-between"><h2 className="text-xl font-extrabold">Creator Rooms</h2><Crown className="text-amber-500"/></div><div className="relative mb-3"><Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"/><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search creator rooms..." className="w-full rounded-full border-0 bg-white py-3 pl-11 pr-4 shadow-sm ring-1 ring-slate-100 outline-none"/></div><div className="flex gap-2 overflow-x-auto pb-2">{[undefined,...CREATOR_ROOM_CATEGORIES].map(c=><button key={c||'all'} onClick={()=>setCategory(c)} className={`shrink-0 rounded-full px-4 py-2 text-xs font-bold ${category===c?'bg-violet-600 text-white':'bg-white text-slate-600'}`}>{c||'All'}</button>)}</div>{loading?<div className="py-10 text-center text-slate-400">Loading...</div>:<div className="mt-3 grid gap-3 sm:grid-cols-2">{rooms.map((room:any)=><div key={room.id} className="overflow-hidden rounded-3xl bg-white shadow-sm ring-1 ring-slate-100"><div className="h-28 bg-gradient-to-r from-indigo-600 to-fuchsia-600">{room.cover_url&&<img src={room.cover_url} alt="" className="h-full w-full object-cover"/>}</div><div className="p-4 pt-0"><div className="-mt-7 flex items-end gap-3"><div className="h-14 w-14 overflow-hidden rounded-2xl bg-violet-100 ring-4 ring-white">{room.avatar_url?<img src={room.avatar_url} alt="" className="h-full w-full object-cover"/>:<div className="flex h-full items-center justify-center text-violet-600"><Users/></div>}</div><div className="min-w-0 flex-1"><div className="flex items-center gap-1"><p className="truncate font-extrabold">{room.name}</p><CreatorBadge/></div><p className="text-xs text-slate-500">{room.creator_display_name||room.owner_name} · {room.member_count} members</p></div></div><p className="mt-3 line-clamp-2 text-sm text-slate-500">{room.description||'Creator voice community.'}</p><button onClick={async()=>{const r=await requestToJoin(room.id);if(r.joined)navigate(`/dashboard/rooms/${room.id}`)}} className="mt-3 w-full rounded-full bg-gradient-to-r from-blue-600 to-violet-600 py-2.5 text-sm font-bold text-white">{room.my_status==='active'?'Open Room':'Join Room'}</button></div></div>)}</div>}</section>}
 
-  return (
-    <div className="space-y-4">
-      <div className="flex gap-2 overflow-x-auto pb-1">
-        <button
-          onClick={() => setCategory(undefined)}
-          className={`shrink-0 px-3 py-1.5 rounded-full text-sm font-medium border ${!category ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-600 border-gray-200'}`}
-        >
-          All
-        </button>
-        {ROOM_CATEGORIES.map(c => (
-          <button
-            key={c}
-            onClick={() => setCategory(c)}
-            className={`shrink-0 px-3 py-1.5 rounded-full text-sm font-medium border ${category === c ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-600 border-gray-200'}`}
-          >
-            {c}
-          </button>
-        ))}
-      </div>
-
-      {error && <p className="text-sm text-red-600">{error}</p>}
-
-      {loading ? (
-        <div className="text-center text-gray-400 py-10">Loading...</div>
-      ) : rooms.length === 0 ? (
-        <div className="text-center py-16 text-gray-500">
-          <Compass className="mx-auto mb-3 text-gray-300" size={40} />
-          <p>Is category me abhi koi public room nahi hai.</p>
-        </div>
-      ) : (
-        <div className="space-y-3">
-          {rooms.map(room => {
-            const isMember = room.my_status === 'active';
-            return (
-              <div key={room.id} className="p-4 bg-white border border-gray-100 rounded-2xl shadow-sm">
-                <div className="flex items-start gap-3">
-                  <div className="w-11 h-11 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center shrink-0">
-                    <Users size={20} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium text-gray-900 truncate">{room.name}</p>
-                    <p className="text-xs text-gray-500">
-                      {room.category && <span className="text-blue-600">{room.category}</span>} · by {room.owner_name} · {room.member_count} member{room.member_count !== 1 ? 's' : ''}
-                    </p>
-                    {room.description && <p className="text-sm text-gray-600 mt-1 line-clamp-2">{room.description}</p>}
-                  </div>
-                </div>
-                <div className="mt-3 flex justify-end">
-                  {isMember ? (
-                    <Link to={`/dashboard/rooms/${room.id}`} className="px-3.5 py-1.5 bg-blue-600 text-white rounded-lg text-sm font-medium">
-                      Open
-                    </Link>
-                  ) : (
-                    <button
-                      onClick={() => handleJoin(room.id)}
-                      disabled={joiningId === room.id}
-                      className="px-3.5 py-1.5 bg-blue-600 text-white rounded-lg text-sm font-medium disabled:opacity-60"
-                    >
-                      {joiningId === room.id ? 'Join ho raha hai...' : 'Join'}
-                    </button>
-                  )}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
-      <button onClick={() => fetchPublicRooms()} className="text-xs text-gray-400 mx-auto block">Refresh</button>
-    </div>
-  );
-}
-
-function CreatorRoomsTab() {
-  const navigate = useNavigate();
-  const [category, setCategory] = useState<string | undefined>(undefined);
-  const [search, setSearch] = useState('');
-  const [searchInput, setSearchInput] = useState('');
-  const { rooms, loading } = useCreatorRooms(category, search);
-  const { requestToJoin } = useRooms();
-  const [joiningId, setJoiningId] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  const handleJoinOrOpen = async (roomId: string, myStatus: string | null) => {
-    if (myStatus === 'active') { navigate(`/dashboard/rooms/${roomId}`); return; }
-    setError(null);
-    setJoiningId(roomId);
-    try {
-      const result = await requestToJoin(roomId);
-      if (result.joined) navigate(`/dashboard/rooms/${roomId}`);
-      else setError('Request bhej di gayi — owner ki approval ka wait karein.');
-    } catch (err: any) {
-      setError(err?.message || 'Join nahi ho paya.');
-    } finally {
-      setJoiningId(null);
-    }
-  };
-
-  return (
-    <div className="space-y-4">
-      <form onSubmit={e => { e.preventDefault(); setSearch(searchInput); }} className="relative">
-        <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
-        <input
-          value={searchInput}
-          onChange={e => setSearchInput(e.target.value)}
-          placeholder="Creator rooms search karein..."
-          className="w-full pl-9 pr-4 py-2.5 bg-gray-100 rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-        />
-      </form>
-
-      <div className="flex gap-2 overflow-x-auto pb-1">
-        <button
-          onClick={() => setCategory(undefined)}
-          className={`shrink-0 px-3 py-1.5 rounded-full text-sm font-medium border ${!category ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-600 border-gray-200'}`}
-        >
-          All
-        </button>
-        {CREATOR_ROOM_CATEGORIES.map(c => (
-          <button
-            key={c}
-            onClick={() => setCategory(c)}
-            className={`shrink-0 px-3 py-1.5 rounded-full text-sm font-medium border ${category === c ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-600 border-gray-200'}`}
-          >
-            {c}
-          </button>
-        ))}
-      </div>
-
-      {error && <p className="text-sm text-red-600">{error}</p>}
-
-      {loading ? (
-        <div className="text-center text-gray-400 py-10">Loading...</div>
-      ) : rooms.length === 0 ? (
-        <div className="text-center py-16 text-gray-500">
-          <Star className="mx-auto mb-3 text-gray-300" size={40} />
-          <p>Abhi koi Creator Room upalabdh nahi hai.</p>
-        </div>
-      ) : (
-        <div className="space-y-3">
-          {rooms.map(room => (
-            <div key={room.id} className="bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-sm">
-              <div className="h-20 bg-gradient-to-r from-indigo-500 to-purple-500 relative">
-                {room.cover_url && <img src={room.cover_url} className="w-full h-full object-cover" alt="" />}
-                {room.is_featured && (
-                  <span className="absolute top-2 right-2 flex items-center gap-1 px-2 py-0.5 bg-amber-400 text-amber-900 text-[10px] font-bold rounded-full">
-                    <Star size={10} fill="currentColor" /> Featured
-                  </span>
-                )}
-              </div>
-              <div className="p-4 pt-0 -mt-6 flex items-end gap-3">
-                {room.avatar_url ? (
-                  <img src={room.avatar_url} className="w-14 h-14 rounded-xl object-cover ring-4 ring-white shrink-0" alt="" />
-                ) : (
-                  <div className="w-14 h-14 rounded-xl bg-purple-100 text-purple-600 flex items-center justify-center ring-4 ring-white shrink-0">
-                    <Users size={22} />
-                  </div>
-                )}
-                <div className="flex-1 min-w-0 pb-0.5">
-                  <div className="flex items-center gap-1.5">
-                    <span className="font-semibold text-gray-900 truncate">{room.name}</span>
-                    <CreatorBadge />
-                  </div>
-                  <p className="text-xs text-gray-500 truncate">
-                    {room.creator_display_name || room.owner_name} · {room.member_count} member{room.member_count !== 1 ? 's' : ''}
-                  </p>
-                </div>
-              </div>
-              {room.description && <p className="px-4 text-sm text-gray-600 line-clamp-2 mb-3">{room.description}</p>}
-              <div className="px-4 pb-4 flex justify-end">
-                <button
-                  onClick={() => handleJoinOrOpen(room.id, room.my_status)}
-                  disabled={joiningId === room.id}
-                  className="px-4 py-1.5 bg-blue-600 text-white rounded-lg text-sm font-medium disabled:opacity-60"
-                >
-                  {joiningId === room.id ? '...' : room.my_status === 'active' ? 'Open' : 'Join'}
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
-  return (
-    <div className="fixed inset-0 bg-black/40 flex items-end sm:items-center justify-center z-[60] p-0 sm:p-4" onClick={onClose}>
-      <div
-        className="bg-white rounded-t-2xl sm:rounded-2xl w-full sm:max-w-sm p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom,0px))] space-y-4"
-        onClick={e => e.stopPropagation()}
-      >
-        <h2 className="text-lg font-semibold text-gray-900">{title}</h2>
-        {children}
-      </div>
-    </div>
-  );
-}
+function Modal({title,onClose,children}:{title:string;onClose:()=>void;children:React.ReactNode}){return <div className="fixed inset-0 z-[70] flex items-end justify-center bg-slate-950/40 p-0 backdrop-blur-sm sm:items-center sm:p-4" onClick={onClose}><div onClick={e=>e.stopPropagation()} className="w-full max-w-md space-y-4 rounded-t-[28px] bg-white p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom,0px))] sm:rounded-[28px]"><div className="flex items-center justify-between"><h2 className="text-xl font-extrabold">{title}</h2><button onClick={onClose} className="rounded-full bg-slate-100 px-3 py-1 text-slate-500">×</button></div>{children}</div></div>}
