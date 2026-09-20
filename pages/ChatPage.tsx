@@ -3,7 +3,7 @@ import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { useNotifications } from '../context/NotificationContext';
-import { Send, Loader2, ArrowLeft, Phone, Video, Image as ImageIcon, WifiOff, Clock3, MoreVertical, Plus, Smile, Camera } from 'lucide-react';
+import { Send, Loader2, ArrowLeft, Phone, Video, Image as ImageIcon, WifiOff, Clock3 } from 'lucide-react';
 import { VoiceRecorder } from '../components/chat/VoiceRecorder';
 import { MessageBubble } from '../components/chat/MessageBubble';
 import { ConfirmDialog } from '../components/chat/ConfirmDialog';
@@ -536,90 +536,124 @@ export default function ChatPage() {
   if (authLoading || messagesLoading) return <div className="flex justify-center p-20"><Loader2 className="animate-spin text-blue-500" size={32}/></div>;
   if (!user) return <div className="p-20 text-center">Please sign in to chat.</div>;
 
-  const displayName = otherUser?.profiles?.display_name || 'Conversation';
-  const online = Boolean(otherUser?.user_id && isUserOnline(otherUser.user_id) && isNetworkOnline);
-
   return (
-    <div className="flex h-full min-h-0 flex-col overflow-hidden bg-[#f7f9ff] text-slate-950">
-      <header className="sticky top-0 z-20 shrink-0 border-b border-white/70 bg-gradient-to-r from-violet-50 via-white to-sky-50 px-3 pb-3 pt-[max(0.7rem,env(safe-area-inset-top))] shadow-[0_8px_30px_rgba(79,70,229,0.08)] sm:px-5">
-        <div className="flex items-center gap-2.5">
-          <button onClick={() => navigate('/dashboard/messages')} className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-white/80 text-slate-700 shadow-sm ring-1 ring-slate-200/70 transition hover:bg-white" aria-label="Back to conversations">
-            <ArrowLeft size={21} />
-          </button>
-          <div className="relative h-11 w-11 shrink-0 overflow-hidden rounded-full bg-gradient-to-br from-violet-200 to-sky-200 p-[2px] shadow-sm">
-            <div className="h-full w-full overflow-hidden rounded-full bg-white">
-              {otherUser?.profiles?.avatar_url ? <img src={otherUser.profiles.avatar_url} alt={displayName} decoding="async" className="h-full w-full object-cover" /> : <div className="grid h-full w-full place-items-center text-base font-extrabold text-violet-700">{displayName.charAt(0).toUpperCase()}</div>}
-            </div>
-            <span className={`absolute bottom-0 right-0 h-3.5 w-3.5 rounded-full border-2 border-white ${online ? 'bg-emerald-500' : 'bg-slate-300'}`} />
-          </div>
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-1.5">
-              <h1 className="truncate text-[17px] font-extrabold tracking-tight">{displayName}</h1>
-              {otherUser?.profiles?.is_ai && <span className="rounded-full bg-violet-100 px-2 py-0.5 text-[9px] font-extrabold text-violet-700">AI</span>}
-            </div>
-            <div className="truncate text-xs font-medium text-slate-500">
-              {otherUser?.profiles?.is_ai ? (isOtherTyping || aiThinking ? <span className="text-violet-600">typing...</span> : <span>AI companion</span>) : isOtherTyping ? <span className="text-violet-600">typing...</span> : !isNetworkOnline ? <span className="text-amber-600">Offline · messages will sync</span> : online ? <span className="text-emerald-600">Online</span> : <span>Offline</span>}
-            </div>
-          </div>
-          {otherUser && !otherUser?.profiles?.is_ai && (
-            <div className="flex shrink-0 items-center gap-0.5">
-              <button onClick={handleVideoCall} disabled={!isNetworkOnline} className="grid h-10 w-10 place-items-center rounded-full text-slate-700 transition hover:bg-white/80 disabled:opacity-40" aria-label="Video Call"><Video size={21} /></button>
-              <button onClick={handleCall} disabled={!isNetworkOnline} className="grid h-10 w-10 place-items-center rounded-full text-slate-700 transition hover:bg-white/80 disabled:opacity-40" aria-label="Call"><Phone size={21} /></button>
-              <button type="button" className="grid h-10 w-10 place-items-center rounded-full text-slate-600 transition hover:bg-white/80" aria-label="More options"><MoreVertical size={20} /></button>
-            </div>
-          )}
+    <div className="flex flex-col h-full bg-gray-50">
+      <div className="pt-safe sticky top-0 bg-white border-b border-gray-200 p-3 sm:p-4 flex items-center gap-2 sm:gap-3 z-10">
+        <button onClick={() => navigate('/dashboard/messages')} className="p-2 hover:bg-gray-100 rounded-full shrink-0" aria-label="Back to conversations">
+            <ArrowLeft size={20} className="text-gray-600" />
+        </button>
+        <div className="w-10 h-10 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold overflow-hidden shrink-0">
+             {otherUser?.profiles?.avatar_url ? <img src={otherUser.profiles.avatar_url} alt="" decoding="async" className="w-full h-full object-cover" /> : otherUser?.profiles?.display_name?.charAt(0)}
         </div>
-      </header>
-
-      {!isNetworkOnline && (
-        <div className="z-10 flex shrink-0 items-center gap-2 border-b border-amber-100 bg-amber-50 px-4 py-2 text-xs font-medium text-amber-800"><WifiOff size={14} /><span>Offline mode · new messages are saved and will sync automatically.</span></div>
-      )}
-      {isNetworkOnline && pendingCount > 0 && (
-        <div className="z-10 flex shrink-0 items-center gap-2 border-b border-indigo-100 bg-indigo-50 px-4 py-1.5 text-xs font-medium text-indigo-700"><Clock3 size={14} /><span>Syncing {pendingCount} pending message{pendingCount > 1 ? 's' : ''}…</span></div>
-      )}
-
-      <main className="relative min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-3 pb-5 pt-4 sm:px-5">
-        <div className="pointer-events-none absolute inset-0 overflow-hidden opacity-45">
-          <div className="absolute -left-16 top-20 h-44 w-44 rounded-full bg-violet-200/30 blur-3xl" />
-          <div className="absolute -right-20 top-1/2 h-56 w-56 rounded-full bg-sky-200/30 blur-3xl" />
-        </div>
-        <div className="relative mx-auto max-w-3xl">
-          <div className="mb-5 flex justify-center"><span className="rounded-full bg-white/75 px-4 py-1.5 text-xs font-bold text-slate-500 shadow-sm ring-1 ring-slate-200/70 backdrop-blur">Today</span></div>
-          <div className="space-y-3.5 sm:space-y-4">
-            {messages.map((m) => {
-              const receipt = receipts[m.id];
-              const receiptStatus: 'sent' | 'delivered' | 'read' = receipt?.read_at ? 'read' : receipt?.delivered_at ? 'delivered' : 'sent';
-              return <MessageBubble key={m.id} message={m} isOwn={m.sender_id === user?.id} receiptStatus={receiptStatus} isHighlighted={highlightedMessageId === m.id} isSelected={selectedMessageId === m.id} isEditing={editingMessage?.id === m.id} editContent={editContent} onEditContentChange={setEditContent} onSaveEdit={updateMessage} onCancelEdit={() => setEditingMessage(null)} onToggleSelect={() => setSelectedMessageId(selectedMessageId === m.id ? null : m.id)} onStartEdit={() => { setEditingMessage(m); setEditContent(m.content_body.replace(" (edited)", "")); setSelectedMessageId(null); }} onRequestDelete={() => { setMessageToDelete(m); setSelectedMessageId(null); }} />;
-            })}
-            {aiThinking && (
-              <div className="flex justify-start"><div className="rounded-[22px] rounded-bl-md bg-white px-4 py-3 shadow-sm ring-1 ring-slate-200/70"><div className="flex items-center gap-1.5"><span className="h-2 w-2 animate-bounce rounded-full bg-violet-400" /><span className="h-2 w-2 animate-bounce rounded-full bg-violet-400 [animation-delay:150ms]" /><span className="h-2 w-2 animate-bounce rounded-full bg-violet-400 [animation-delay:300ms]" /></div></div></div>
+        <div className="flex-1 min-w-0">
+          <div className="font-semibold text-gray-900 truncate flex items-center gap-1.5">
+            {otherUser?.profiles?.display_name || 'Conversation'}
+            {otherUser?.profiles?.is_ai && (
+              <span className="shrink-0 text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-purple-100 text-purple-700">AI</span>
             )}
           </div>
-          <div ref={scrollRef} />
+          <div className="text-xs min-h-4 truncate">
+            {otherUser?.profiles?.is_ai ? (
+              isOtherTyping || aiThinking ? <span className="text-blue-600 font-medium">typing...</span> : <span className="text-gray-400">AI companion</span>
+            ) : isOtherTyping ? <span className="text-blue-600 font-medium">typing...</span> : isNetworkOnline ? (isUserOnline(otherUser?.user_id) ? <span className="text-green-600">online</span> : <span className="text-gray-400">offline</span>) : <span className="text-amber-600">You’re offline · messages will send when online</span>}
+          </div>
         </div>
-      </main>
-
-      <ConfirmDialog isOpen={!!messageToDelete} title="Delete Message" message="Are you sure you want to delete this message?" onConfirm={async () => { await deleteMessage(messageToDelete); setMessageToDelete(null); }} onCancel={() => setMessageToDelete(null)} />
-
-      <form onSubmit={sendMessage} className="shrink-0 border-t border-white/80 bg-white/90 px-3 pb-[max(0.55rem,env(safe-area-inset-bottom))] pt-2.5 shadow-[0_-8px_30px_rgba(15,23,42,0.06)] backdrop-blur-xl sm:px-5 sm:pb-4">
-        <div className="mx-auto flex max-w-3xl items-center gap-2 rounded-[28px] bg-slate-100/90 p-1.5 ring-1 ring-slate-200/80">
-          <VoiceRecorder onMessageSent={handleVoiceMessageSent} onBusyChange={setIsVoiceComposerBusy} />
-          {!isVoiceComposerBusy && (
-            <>
-              <button type="button" onClick={() => fileInputRef.current?.click()} className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-white text-slate-600 shadow-sm transition hover:text-violet-600" aria-label="Add attachment"><Plus size={22} /></button>
-              <input type="file" ref={fileInputRef} onChange={handleImageUpload} accept="image/*" capture="environment" className="hidden" />
-              <div className="relative flex min-w-0 flex-1 items-center">
-                <input value={newMessage} onChange={(e) => handleTyping(e.target.value)} className="h-11 w-full min-w-0 bg-transparent px-3 pr-20 text-[15px] text-slate-900 outline-none placeholder:text-slate-400" placeholder={isNetworkOnline ? 'Message...' : 'Message offline...'} />
-                <div className="absolute right-1 flex items-center gap-0.5 text-slate-500">
-                  <button type="button" onClick={() => fileInputRef.current?.click()} className="grid h-9 w-9 place-items-center rounded-full hover:bg-white" aria-label="Camera"><Camera size={19} /></button>
-                  <button type="button" onClick={() => fileInputRef.current?.click()} className="grid h-9 w-9 place-items-center rounded-full hover:bg-white" aria-label="Add image"><ImageIcon size={19} /></button>
-                  <button type="button" className="grid h-9 w-9 place-items-center rounded-full hover:bg-white" aria-label="Emoji"><Smile size={19} /></button>
-                </div>
-              </div>
-              <button type="submit" disabled={!newMessage.trim()} className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-gradient-to-br from-blue-600 to-violet-600 text-white shadow-lg shadow-indigo-200 transition hover:scale-105 disabled:opacity-40 disabled:hover:scale-100" aria-label="Send message">{isNetworkOnline ? <Send size={19} /> : <WifiOff size={18} />}</button>
-            </>
-          )}
+        {otherUser && !otherUser?.profiles?.is_ai && (
+            <div className="flex items-center gap-1 shrink-0">
+                {/* Only gated on *our own* connectivity now — the other
+                    person's presence dot no longer disables calling them.
+                    A "ringing" call now reaches them via push notification
+                    even while their app/tab is fully closed (see
+                    api/send-push.ts + the ringing-call catch-up check in
+                    VoiceCallContext.tsx), so requiring them to already be
+                    online defeated that entirely. */}
+                <button onClick={handleVideoCall} disabled={!isNetworkOnline} className="p-2 hover:bg-gray-100 rounded-full disabled:opacity-40 text-gray-600" aria-label="Video Call">
+                    <Video size={20} />
+                </button>
+                <button onClick={handleCall} disabled={!isNetworkOnline} className="p-2 hover:bg-gray-100 rounded-full disabled:opacity-40 text-gray-600" aria-label="Call">
+                    <Phone size={20} />
+                </button>
+                <div className={`w-2 h-2 rounded-full shrink-0 ${isUserOnline(otherUser.user_id) && isNetworkOnline ? 'bg-green-500' : 'bg-gray-300'}`} />
+            </div>
+        )}
+      </div>
+      
+      {!isNetworkOnline && (
+        <div className="px-3 py-2 bg-amber-50 border-b border-amber-100 text-amber-800 text-xs sm:text-sm flex items-center gap-2">
+          <WifiOff size={15} />
+          <span>Offline mode: chat is still available. New messages are saved on this device and will sync automatically.</span>
         </div>
+      )}
+      {isNetworkOnline && pendingCount > 0 && (
+        <div className="px-3 py-1.5 bg-blue-50 border-b border-blue-100 text-blue-700 text-xs flex items-center gap-2">
+          <Clock3 size={14} />
+          <span>Syncing {pendingCount} pending message{pendingCount > 1 ? 's' : ''}…</span>
+        </div>
+      )}
+      <div className="flex-1 overflow-y-auto overflow-x-hidden p-3 sm:p-4 space-y-3 sm:space-y-4">
+        {messages.map((m) => {
+          const receipt = receipts[m.id];
+          const receiptStatus: 'sent' | 'delivered' | 'read' = receipt?.read_at ? 'read' : receipt?.delivered_at ? 'delivered' : 'sent';
+          return (
+          <MessageBubble
+            key={m.id}
+            message={m}
+            isOwn={m.sender_id === user?.id}
+            receiptStatus={receiptStatus}
+            isHighlighted={highlightedMessageId === m.id}
+            isSelected={selectedMessageId === m.id}
+            isEditing={editingMessage?.id === m.id}
+            editContent={editContent}
+            onEditContentChange={setEditContent}
+            onSaveEdit={updateMessage}
+            onCancelEdit={() => setEditingMessage(null)}
+            onToggleSelect={() => setSelectedMessageId(selectedMessageId === m.id ? null : m.id)}
+            onStartEdit={() => { setEditingMessage(m); setEditContent(m.content_body.replace(" (edited)", "")); setSelectedMessageId(null); }}
+            onRequestDelete={() => { setMessageToDelete(m); setSelectedMessageId(null); }}
+          />
+          );
+        })}
+        {aiThinking && (
+          <div className="flex justify-start">
+            <div className="bg-gray-200 rounded-2xl rounded-bl-sm px-4 py-3 flex gap-1.5 items-center w-fit">
+              <span className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+              <span className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+              <span className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+            </div>
+          </div>
+        )}
+        <div ref={scrollRef} />
+      </div>
+      
+      <ConfirmDialog
+        isOpen={!!messageToDelete}
+        title="Delete Message"
+        message="Are you sure you want to delete this message?"
+        onConfirm={async () => {
+            await deleteMessage(messageToDelete);
+            setMessageToDelete(null);
+        }}
+        onCancel={() => setMessageToDelete(null)}
+      />
+      
+      
+      <form onSubmit={sendMessage} className="pb-safe p-2 sm:p-4 bg-white border-t flex gap-1 sm:gap-2 w-full items-center">
+        <VoiceRecorder onMessageSent={handleVoiceMessageSent} onBusyChange={setIsVoiceComposerBusy} />
+        {!isVoiceComposerBusy && (
+          <>
+            <button type="button" onClick={() => fileInputRef.current?.click()} className="p-3 hover:bg-gray-100 rounded-full shrink-0 text-gray-500" aria-label="Attach image">
+                <ImageIcon size={20} />
+            </button>
+            <input type="file" ref={fileInputRef} onChange={handleImageUpload} accept="image/*" className="hidden" />
+            <input 
+              value={newMessage}
+              onChange={(e) => handleTyping(e.target.value)}
+              className="flex-1 p-3 px-4 bg-gray-100 border-none rounded-full outline-none focus:ring-2 focus:ring-blue-500 min-w-0"
+              placeholder={isNetworkOnline ? "Message..." : "Message offline..."}
+            />
+            <button type="submit" disabled={!newMessage.trim()} className="p-3 bg-blue-600 text-white rounded-full shrink-0 disabled:opacity-50" aria-label="Send message">{isNetworkOnline ? <Send size={20} /> : <WifiOff size={19} />}</button>
+          </>
+        )}
       </form>
     </div>
   );
