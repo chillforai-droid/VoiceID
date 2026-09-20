@@ -1,0 +1,13 @@
+import { Users, Radio, MessageCircle, Mic, UserPlus, ShieldCheck } from 'lucide-react';
+import MarketingLanding from '../../components/seo/MarketingLanding';
+
+const faqs = [
+  { q: 'What are VoiceID voice rooms?', a: 'Voice rooms are spaces where people can gather for live voice-focused conversations, depending on the room features enabled on the platform.' },
+  { q: 'Can I create a room?', a: 'Accounts with the relevant room permissions can use the room creation flow available inside VoiceID.' },
+  { q: 'Can I join from a phone?', a: 'You can use a supported mobile browser or compatible app experience, subject to microphone and browser permissions.' },
+  { q: 'Are rooms always public?', a: 'Room visibility and access depend on the settings and permissions configured for each room.' },
+];
+
+export default function GroupVoiceChatPage() {
+  return <MarketingLanding path="/group-voice-chat" breadcrumbLabel="Group Voice Chat" seoTitle="Group Voice Chat Rooms Online | VoiceID" metaDescription="Discover VoiceID group voice chat rooms for live conversations, communities and creator-led discussions." keywords="group voice chat, voice chat rooms, live voice rooms, group audio chat, online voice room" h1="Join Conversations in Voice Rooms" intro="Meet people in shared voice spaces, follow discussions and participate when a room fits your interests." benefits={[{ icon: Users, title: 'Shared Conversations', description: 'Join voice-focused spaces built around group discussions and social interaction.' }, { icon: Radio, title: 'Live Room Experience', description: 'Explore available rooms and see where conversations are happening.' }, { icon: MessageCircle, title: 'Room Chat', description: 'Use supported room messaging features to add context to live discussions.' }, { icon: Mic, title: 'Voice Participation', description: 'Participate with microphone access when room permissions allow it.' }, { icon: UserPlus, title: 'Meet Communities', description: 'Find rooms and creators that match your interests and preferred conversation style.' }, { icon: ShieldCheck, title: 'Room Controls', description: 'Room access and participation are controlled by room settings and permissions.' }]} howItWorks={[{ title: 'Open Rooms', description: 'Go to the Rooms area in VoiceID.' }, { title: 'Explore or search', description: 'Review available rooms and choose a conversation that interests you.' }, { title: 'Join and participate', description: 'Enter the room and use the available controls responsibly.' }]} faqs={faqs} relatedLinks={[{ label: 'Rooms', path: '/features' }, { label: 'Video Calls', path: '/video-calls' }, { label: 'Online Chat', path: '/online-chat' }]} />;
+}

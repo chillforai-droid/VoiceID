@@ -1,0 +1,13 @@
+import { Mic, MessageSquare, Clock, Smartphone, Play, ShieldCheck } from 'lucide-react';
+import MarketingLanding from '../../components/seo/MarketingLanding';
+
+const faqs = [
+  { q: 'What are voice notes?', a: 'Voice notes are short audio messages you can record and send when speaking is easier than typing.' },
+  { q: 'Can I send voice notes from mobile?', a: 'VoiceID voice messaging is designed for supported mobile and desktop environments with microphone permissions enabled.' },
+  { q: 'When should I use a voice note?', a: 'Voice notes can be useful for quick updates, pronunciation, longer explanations or moments when typing is inconvenient.' },
+  { q: 'Can I control microphone permissions?', a: 'Yes. Your browser or device controls microphone permission, and you can change it in settings.' },
+];
+
+export default function VoiceNotesPage() {
+  return <MarketingLanding path="/voice-notes" breadcrumbLabel="Voice Notes" seoTitle="Voice Notes App — Send Audio Messages Online | VoiceID" metaDescription="Send voice notes online with VoiceID. Record quick audio messages and stay connected when typing is inconvenient." keywords="voice notes app, send audio messages, voice message online, audio chat app, voice memo messenger" h1="Say It With a Voice Note" intro="Send quick audio messages when your voice explains it better than a long text." benefits={[{ icon: Mic, title: 'Record Audio Messages', description: 'Use voice recording for quick updates, replies and personal messages.' }, { icon: MessageSquare, title: 'Keep Conversations Moving', description: 'Add audio replies to your existing messaging experience.' }, { icon: Clock, title: 'Save Typing Time', description: 'Speak naturally instead of typing every detail on a small screen.' }, { icon: Smartphone, title: 'Built for Mobile', description: 'Use voice messaging on supported phones, tablets and desktop browsers.' }, { icon: Play, title: 'Listen When Ready', description: 'Play received audio messages when it is convenient for you.' }, { icon: ShieldCheck, title: 'Browser Permission Control', description: 'Microphone access remains under your browser and device permission controls.' }]} howItWorks={[{ title: 'Open a conversation', description: 'Choose a conversation in VoiceID.' }, { title: 'Tap the voice control', description: 'Allow microphone access if your browser asks for it.' }, { title: 'Record and send', description: 'Record your message, review the control state and send it when ready.' }]} faqs={faqs} relatedLinks={[{ label: 'Voice Messaging', path: '/voice-messaging' }, { label: 'Online Chat', path: '/online-chat' }, { label: 'Browser Chat', path: '/browser-chat' }]} />;
+}

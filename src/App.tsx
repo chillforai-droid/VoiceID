@@ -33,6 +33,11 @@ const HelpPage = lazy(() => import('./pages/landing/HelpPage'));
 const PrivacyLanding = lazy(() => import('./pages/landing/PrivacyLanding'));
 const SecurityPage = lazy(() => import('./pages/landing/SecurityPage'));
 const AboutPage = lazy(() => import('./pages/landing/AboutPage'));
+const VoiceChatPage = lazy(() => import('./pages/landing/VoiceChatPage'));
+const GroupVoiceChatPage = lazy(() => import('./pages/landing/GroupVoiceChatPage'));
+const VoiceNotesPage = lazy(() => import('./pages/landing/VoiceNotesPage'));
+const VoiceRoomsForCreatorsPage = lazy(() => import('./pages/landing/VoiceRoomsForCreatorsPage'));
+const UsernameChatPage = lazy(() => import('./pages/landing/UsernameChatPage'));
 const StorePage = lazy(() => import('./pages/StorePage'));
 const ProductDetailPage = lazy(() => import('./pages/ProductDetailPage'));
 
@@ -90,6 +95,11 @@ export default function App() {
                   <Route path="/privacy" element={<PrivacyLanding />} />
                   <Route path="/security" element={<SecurityPage />} />
                   <Route path="/about" element={<AboutPage />} />
+                  <Route path="/voice-chat" element={<VoiceChatPage />} />
+                  <Route path="/group-voice-chat" element={<GroupVoiceChatPage />} />
+                  <Route path="/voice-notes" element={<VoiceNotesPage />} />
+                  <Route path="/creator-voice-rooms" element={<VoiceRoomsForCreatorsPage />} />
+                  <Route path="/username-chat" element={<UsernameChatPage />} />
                   <Route path="/store" element={<StorePage />} />
                   <Route path="/store/:slug" element={<ProductDetailPage />} />
                   <Route path="/auth/welcome" element={<Welcome />} />
