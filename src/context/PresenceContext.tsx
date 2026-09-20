@@ -12,9 +12,24 @@ const PresenceContext = createContext<PresenceContextType>({} as PresenceContext
 export const PresenceProvider = ({ children }: { children: React.ReactNode }) => {
     const { user } = useAuth();
     const [onlineUsers, setOnlineUsers] = useState<Set<string>>(new Set());
+    const [aiUsers, setAiUsers] = useState<Set<string>>(new Set());
 
     useEffect(() => {
-        if (!user) return;
+        if (!user) {
+            setOnlineUsers(new Set());
+            setAiUsers(new Set());
+            return;
+        }
+
+        let cancelled = false;
+        void supabase
+            .from('profiles')
+            .select('id')
+            .eq('is_ai', true)
+            .then(({ data }) => {
+                if (cancelled) return;
+                setAiUsers(new Set((data || []).map((profile: any) => profile.id).filter(Boolean)));
+            });
 
         const channel = supabase.channel('voiceid:online-users');
 
@@ -39,11 +54,15 @@ export const PresenceProvider = ({ children }: { children: React.ReactNode }) =>
         });
 
         return () => {
+            cancelled = true;
             supabase.removeChannel(channel);
         };
     }, [user]);
 
-    const isUserOnline = useCallback((userId: string) => onlineUsers.has(userId), [onlineUsers]);
+    const isUserOnline = useCallback(
+        (userId: string) => Boolean(userId) && (aiUsers.has(userId) || onlineUsers.has(userId)),
+        [aiUsers, onlineUsers],
+    );
 
     const value = useMemo(() => ({ onlineUsers, isUserOnline }), [onlineUsers, isUserOnline]);
 
