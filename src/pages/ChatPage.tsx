@@ -601,22 +601,23 @@ export default function ChatPage() {
 
       <ConfirmDialog isOpen={!!messageToDelete} title="Delete Message" message="Are you sure you want to delete this message?" onConfirm={async () => { await deleteMessage(messageToDelete); setMessageToDelete(null); }} onCancel={() => setMessageToDelete(null)} />
 
-      <form onSubmit={sendMessage} className="shrink-0 border-t border-white/80 bg-white/90 px-3 pb-[max(0.55rem,env(safe-area-inset-bottom))] pt-2.5 shadow-[0_-8px_30px_rgba(15,23,42,0.06)] backdrop-blur-xl sm:px-5 sm:pb-4">
-        <div className="mx-auto flex max-w-3xl items-center gap-2 rounded-[28px] bg-slate-100/90 p-1.5 ring-1 ring-slate-200/80">
-          <VoiceRecorder onMessageSent={handleVoiceMessageSent} onBusyChange={setIsVoiceComposerBusy} />
+      <form onSubmit={sendMessage} className="shrink-0 border-t border-white/80 bg-white/95 px-2 pb-[max(0.55rem,env(safe-area-inset-bottom))] pt-2.5 shadow-[0_-8px_30px_rgba(15,23,42,0.06)] backdrop-blur-xl sm:px-5 sm:pb-4">
+        <div className="mx-auto flex w-full max-w-3xl items-center gap-1.5 rounded-[30px] bg-slate-100/95 p-1.5 ring-1 ring-slate-200/80">
+          <div className="shrink-0">
+            <VoiceRecorder onMessageSent={handleVoiceMessageSent} onBusyChange={setIsVoiceComposerBusy} />
+          </div>
           {!isVoiceComposerBusy && (
             <>
-              <button type="button" onClick={() => fileInputRef.current?.click()} className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-white text-slate-600 shadow-sm transition hover:text-violet-600" aria-label="Add attachment"><Plus size={22} /></button>
+              <button type="button" onClick={() => fileInputRef.current?.click()} className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-white text-slate-600 shadow-sm transition hover:text-violet-600" aria-label="Add attachment"><Plus size={21} /></button>
               <input type="file" ref={fileInputRef} onChange={handleImageUpload} accept="image/*" capture="environment" className="hidden" />
-              <div className="relative flex min-w-0 flex-1 items-center">
-                <input value={newMessage} onChange={(e) => handleTyping(e.target.value)} className="h-11 w-full min-w-0 bg-transparent px-3 pr-20 text-[15px] text-slate-900 outline-none placeholder:text-slate-400" placeholder={isNetworkOnline ? 'Message...' : 'Message offline...'} />
-                <div className="absolute right-1 flex items-center gap-0.5 text-slate-500">
-                  <button type="button" onClick={() => fileInputRef.current?.click()} className="grid h-9 w-9 place-items-center rounded-full hover:bg-white" aria-label="Camera"><Camera size={19} /></button>
-                  <button type="button" onClick={() => fileInputRef.current?.click()} className="grid h-9 w-9 place-items-center rounded-full hover:bg-white" aria-label="Add image"><ImageIcon size={19} /></button>
-                  <button type="button" className="grid h-9 w-9 place-items-center rounded-full hover:bg-white" aria-label="Emoji"><Smile size={19} /></button>
+              <div className="flex min-w-0 flex-1 items-center rounded-full bg-white/90 px-3 shadow-inner ring-1 ring-slate-200/70">
+                <input value={newMessage} onChange={(e) => handleTyping(e.target.value)} className="h-10 min-w-0 w-full flex-1 bg-transparent text-[15px] text-slate-900 outline-none placeholder:text-slate-400" placeholder={isNetworkOnline ? 'Message...' : 'Message offline...'} aria-label="Message" />
+                <div className="ml-1 flex shrink-0 items-center gap-0.5 text-slate-500">
+                  <button type="button" onClick={() => fileInputRef.current?.click()} className="grid h-8 w-8 place-items-center rounded-full hover:bg-slate-100" aria-label="Add image"><ImageIcon size={18} /></button>
+                  <button type="button" className="hidden sm:grid h-8 w-8 place-items-center rounded-full hover:bg-slate-100" aria-label="Emoji"><Smile size={18} /></button>
                 </div>
               </div>
-              <button type="submit" disabled={!newMessage.trim()} className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-gradient-to-br from-blue-600 to-violet-600 text-white shadow-lg shadow-indigo-200 transition hover:scale-105 disabled:opacity-40 disabled:hover:scale-100" aria-label="Send message">{isNetworkOnline ? <Send size={19} /> : <WifiOff size={18} />}</button>
+              <button type="submit" disabled={!newMessage.trim()} className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-gradient-to-br from-blue-600 to-violet-600 text-white shadow-lg shadow-indigo-200 transition hover:scale-105 disabled:opacity-40 disabled:hover:scale-100" aria-label="Send message">{isNetworkOnline ? <Send size={18} /> : <WifiOff size={17} />}</button>
             </>
           )}
         </div>

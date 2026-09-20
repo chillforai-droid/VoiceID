@@ -311,7 +311,7 @@ export function VoiceRecorder({ onMessageSent, onBusyChange }: { onMessageSent: 
   };
 
   return (
-    <div className="flex flex-col gap-2 min-w-0 flex-1">
+    <div className="flex flex-col gap-2 min-w-0">
       {error && <p className="text-red-500 text-xs sm:text-sm break-words">{error}</p>}
       <div className="flex items-center gap-3">
         {audioBlob ? (
