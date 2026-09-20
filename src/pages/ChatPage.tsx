@@ -609,7 +609,7 @@ export default function ChatPage() {
           {!isVoiceComposerBusy && (
             <>
               <button type="button" onClick={() => fileInputRef.current?.click()} className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-white text-slate-600 shadow-sm transition hover:text-violet-600" aria-label="Add attachment"><Plus size={21} /></button>
-              <input type="file" ref={fileInputRef} onChange={handleImageUpload} accept="image/*" capture="environment" className="hidden" />
+              <input type="file" ref={fileInputRef} onChange={handleImageUpload} accept="image/*,.jpg,.jpeg,.png,.webp" className="hidden" />
               <div className="flex min-w-0 flex-1 items-center rounded-full bg-white/90 px-3 shadow-inner ring-1 ring-slate-200/70">
                 <input value={newMessage} onChange={(e) => handleTyping(e.target.value)} className="h-10 min-w-0 w-full flex-1 bg-transparent text-[15px] text-slate-900 outline-none placeholder:text-slate-400" placeholder={isNetworkOnline ? 'Message...' : 'Message offline...'} aria-label="Message" />
                 <div className="ml-1 flex shrink-0 items-center gap-0.5 text-slate-500">
